@@ -68,7 +68,7 @@ And log onto DockerHub to confirm that the upload has been successful.
 To stark the test cluster run,
 
 ```bash
-minikube start
+minikube start --memory 4096
 ```
 
 This may take a while. To test that the cluster is operation run,
@@ -113,7 +113,7 @@ Note that we need to use Minikube-specific commands as Minikube cannot setup a l
 
 ## Configuring a Multi-Node Cluster on Google Cloud Platform
 
-In order to perform testing on a real-world Kubernetes cluster with far greater resources that those available on a laptop, the easiest way is to use a managed Kubernetes platform from a cloud provider. We will use Kubernetes on Google Cloud Platform (GCP).
+In order to perform testing on a real-world Kubernetes cluster with far greater resources that those available on a laptop, the easiest way is to use a managed Kubernetes platform from a cloud provider. We will use Kubernetes Engine on Google Cloud Platform (GCP).
 
 ### Getting Up-and-Running with Google Cloud Platform
 
@@ -142,7 +142,7 @@ Which will open a browser and guide you through the necessary authentication ste
 Firstly, within the GCP UI visit the Kubernetes Engine page to trigger the Kubernetes API start-up. Then from the command line we start a cluster (eligible for use with the GCP free-tier) using,
 
 ```bash
-gcloud container clusters create k8s-test-cluster --num-nodes 3 --machine-type f1-micro
+gcloud container clusters create k8s-test-cluster --num-nodes 3 --machine-type g1-small
 ```
 
 And then go make a cup of coffee while you wait for the cluster to be created.
@@ -162,6 +162,12 @@ But, to find the external IP address for the GCP cluster we need to use,
 kubectl get services
 ```
 
+And then we can test our service on GCP - for example,
+
+```bash
+curl http://35.234.149.50:5000/test_api
+```
+
 ## Switching Between Kubectl Contexts
 
 If you are running both with Minikube locally and with a cluster on GCP then you can switch Kubectl 'context' from one cluster to the other using, for example,
@@ -176,8 +182,217 @@ Where the list of available context can be found using,
 kubectl config get-contexts
 ```
 
-And then we can test our service on GCP - for example,
+## Installing Ksonnet
+
+Both Seldon and KubeFlow use [Ksonnet](https://ksonnet.io) - a templating system for configuring Kubernetes to deploy ML applications. The easiest way to install Ksonnet (on Mac OS X) is to use Homebrew again,
 
 ```bash
-curl http://35.234.149.50:5000/test_api
+brew install ksonnet/tap/ks
+```
+
+Conform that the installation has been successful by running,
+
+```bash
+ks version
+```
+
+## Using Seldon to Build a Machine Learning Service on Kubernetes
+
+TODO
+
+### Installing Seldon-Core using Ksonnet
+
+We follow the [official documentation](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet) for installing Seldon-Core with Ksonnet and configuring it to use the Ambassador reverse proxy as the API endpoint for our Seldon ML services. We start by creating a Seldon Ksonnet app,
+
+```bash
+ks init seldon-core-test-api --api-spec=version:v1.8.0
+```
+
+This will create a directory called `seldon-core-test-api` in the project's root directory, containing all of the components necessary for a Ksonnet app. And then configure the Ksonnet app to deploy Seldon-core,
+
+```bash
+cd seldon-core-test-api && \
+    ks registry add seldon-core github.com/SeldonIO/seldon-core/tree/master/seldon-core && \
+    ks pkg install seldon-core/seldon-core@master && \
+    ks generate seldon-core seldon-core \
+       --withApife=false \
+       --withAmbassador=true \
+       --withRbac=false \
+       --singleNamespace=true
+```
+
+Deploy the app using,
+
+```bash
+ks apply default
+```
+
+We will use our cluster on GCP for testing. Confirm that the deployment has worked by using,
+
+```bash
+kubectl get services
+```
+
+### Installing Source-to-Image
+
+Seldon-core depends heavily on [Source-to-Image](https://github.com/openshift/source-to-image) - a tool for building artifacts from source and injecting into docker images. In Seldon's use-case the artifacts are the different pieces of an ML pipeline. We use Homebrew to install on Mac OS X,
+
+```bash
+brew install source-to-image
+```
+
+To confirm that it has been installed correctly run,
+
+```bash
+s2i version
+```
+
+### Install the Seldon-Core Python Package
+
+We're using [Pipenv](https://pipenv.readthedocs.io/en/latest/) to manage the Python dependencies in this project. To install `seldon-core` into the virtual environment use,
+
+```bash
+pipenv install --dev seldon-core
+```
+
+Where the `--dev` flags that this is a development dependency (i.e. don't include it as part of the Docker image that we use for our simple test API).
+
+### Building an ML Component for Seldon
+
+Following [these guidelines](https://github.com/SeldonIO/seldon-core/blob/master/docs/wrappers/python.md) for defining a Python class that wraps an ML model.
+
+Generate a `requirements.txt` file,
+
+```bash
+pipenv lock -r > seldon-component/requirements.txt
+```
+
+Make sure the docker daemon is running and then run,
+
+```bash
+s2i build seldon-component seldonio/seldon-core-s2i-python3:0.4 alexioannides/seldon-test-model
+```
+
+Launch the container using Docker locally,
+
+```bash
+docker run --name seldon-test -p 5000:5000 -d seldon-test-model
+```
+
+Then test it,
+
+```bash
+seldon-core-tester seldon-component/contract.json localhost 5000 -p
+```
+
+And then push it to an image registry,
+
+```bash
+docker push alexioannides/seldon-test-model
+```
+
+### Building a Test API with Seldon-Core
+
+[TODO](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet)
+
+Preamble for GCP,
+
+```bash
+kubectl create clusterrolebinding my-cluster-admin-binding \
+    --clusterrole=cluster-admin
+    --user=$(gcloud info --format="value(config.account)")
+```
+
+or for Minikube,
+
+```bash
+kubectl create clusterrolebinding kube-system-cluster-admin \
+    --clusterrole=cluster-admin \
+    --serviceaccount=kube-system:default
+```
+
+Then,
+
+```bash
+kubectl create namespace seldon
+kubectl config set-context $(kubectl config current-context) --namespace=seldon
+```
+
+Then,
+
+```bash
+ks init seldon-ksonnet-app --api-spec=version:v1.8.0
+```
+
+Then,
+
+```bash
+cd seldon-ksonnet-app
+ks registry add seldon-core github.com/SeldonIO/seldon-core/tree/master/seldon-core
+ks pkg install seldon-core/seldon-core@master
+ks generate seldon-core seldon-core \
+    --withApife=false \
+    --withAmbassador=true \
+    --withRbac=true \
+    --singleNamespace=true \
+    --namespace=seldon
+```
+
+Then,
+
+```bash
+ks apply default
+```
+
+Then,
+
+```bash
+ks generate seldon-serve-simple-v1alpha2 seldon-test-model --image alexioannides/seldon-test-model
+ks apply default -c seldon-test-model
+```
+
+#### Expose the Test API to the Outside World
+
+If working on GCP,
+
+```bash
+kubectl expose deployment seldon-core-ambassador --type=LoadBalancer --name=seldon-core-ambassador-external
+```
+
+Get external IP,
+
+```bash
+kubectl get services
+```
+
+Or if working locally with Minikube,
+
+```bash
+kubectl port-forward $(kubectl get pods -n seldon -l service=ambassador -o jsonpath='{.items[0].metadata.name}') -n seldon 8003:8080
+```
+
+#### Testing the API
+
+But in any case, this is what we're aiming to use for testing. For GCP,
+
+```bash
+curl -v 35.242.173.29:8080/seldon/seldon-test-model/api/v0.1/predictions -d '{"data":{"names":["a","b"],"tensor":{"shape":[2,2],"values":[0,0,1,1]}}}' -H "Content-Type: application/json"
+```
+
+Or for Minikube,
+
+```bash
+curl -v localhost:8003/seldon/seldon-test-model/api/v0.1/predictions -d '{"data":{"names":["a","b"],"tensor":{"shape":[2,2],"values":[0,0,1,1]}}}' -H "Content-Type: application/json"
+```
+
+#### Tear Down
+
+```bash
+cd seldon-ksonnet-app && ks delete default
+```
+
+Then,
+
+```bash
+rm -rf seldon-ksonnet-app
 ```
