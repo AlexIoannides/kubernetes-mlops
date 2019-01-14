@@ -4,7 +4,7 @@ for ML model.
 """
 
 
-class TestModel:
+class MLScore:
     """
     Model template. You can load your model parameters in __init__ from
     a location accessible at runtime
