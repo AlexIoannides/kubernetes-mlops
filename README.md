@@ -28,7 +28,7 @@ Where 'alexioannides' refers to the name of the DockerHub account that we will p
 docker run --name test-api -p 5000:5000 -d alexioannides/test-ml-score-api
 ```
 
-Then check that the container is listed as running using,
+Where we have mapped port 5000 from the Docker container - i.e. the port our ML model scoring service is listening to - to port 5000 on our host machine (localhost). Then check that the container is listed as running using,
 
 ```bash
 docker ps
@@ -49,7 +49,7 @@ Where you should expect a response along the lines of,
 {"score":[1,2]}
 ```
 
-As all our test model does is return the input data - i.e. it is the identity function. Now that the container has been confirmed as operational, we can stop and remove it,
+All our test model does is return the input data - i.e. it is the identity function (only a few lines of additional code are required to modify this service to load a SciKit Learn model from disk and pass new data to it's 'predict' method for generating predictions). Now that the container has been confirmed as operational, we can stop and remove it,
 
 ```bash
 docker stop test-api
@@ -58,13 +58,13 @@ docker rm test-api
 
 ### Pushing a Docker Image to DockerHub
 
-In order for a remote Docker host or Kubernetes cluster to have access to the image we've created, we need to publish it to an image registry. All the cloud computing providers that offer managed Docker-based services will provide private image registries, but we will use the public image registry at DockerHub. To push our new image to DockerHub (where my account ID is 'alexioannides'), use,
+In order for a remote Docker host or Kubernetes cluster to have access to the image we've created, we need to publish it to an image registry. All the cloud computing providers that offer managed Docker-based services will provide private image registries, but we will use the public image registry at DockerHub. To push our new image to DockerHub (where my account ID is 'alexioannides') use,
 
 ```bash
 docker push alexioannides/test-ml-score-api
 ```
 
-Where we can now see that our chosen naming convention for the image is intrinsically linked to our target image registry. Once the upload is finished, log onto DockerHub to confirm that the upload has been successful via the DockerHub UI.
+Where we can now see that our chosen naming convention for the image is intrinsically linked to our target image registry (and you will need to insert your own account ID where necessary). Once the upload is finished, log onto DockerHub to confirm that the upload has been successful via the DockerHub UI.
 
 ## Installing Minikube for Local Development and Testing
 
@@ -80,7 +80,7 @@ To start the test cluster run,
 minikube start --memory 4096
 ```
 
-Where we have specified the minimum amount of memory required to deploy a single Seldon ML component. This may take a while. To test that the cluster is operation run,
+Where we have specified the minimum amount of memory required to deploy a single Seldon ML component. This may take a while. To test that the cluster is operational run,
 
 ```bash
 kubectl cluster-info
@@ -90,7 +90,7 @@ Where `kubectl` is the standard Command Line Interface (CLI) client for interact
 
 ### Launching the Containerised ML Model Scoring Service on Minikube
 
-To launch our test model scoring service on Kubernetes, start by running the container within a Kubernetes pod that is managed by a replication controller,
+To launch our test model scoring service on Kubernetes, start by running the container within a Kubernetes [pod](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/) that is managed by a [replication controller](https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/),
 
 ```bash
 kubectl run test-ml-score-api --image=alexioannides/test-ml-score-api:latest --port=5000 --generator=run/v1
@@ -117,13 +117,13 @@ curl http://localhost:5000/score \
     --data '{"X": [1, 2]}'
 ```
 
-To expose the container as a (load balanced) service to the outside world, we have to create a Kubernetes service that references it. This is achieved with the following command,
+To expose the container as a (load balanced) [service](https://kubernetes.io/docs/concepts/services-networking/service/) to the outside world, we have to create a Kubernetes service that references it. This is achieved with the following command,
 
 ```bash
 kubectl expose rc test-ml-score-api --type=LoadBalancer --name test-ml-score-api-http
 ```
 
-To check that this has worked and to find the services external IP address run,
+To check that this has worked and to find the services's external IP address run,
 
 ```bash
 minikube service list
@@ -138,7 +138,7 @@ curl http://192.168.99.100:30888/score \
     --data '{"X": [1, 2]}'
 ```
 
-Note that we need to use Minikube-specific commands as Minikube cannot setup a load balancer for real. To tear-down the load balancer, replication controller, pod and Minikube cluster run the following commands,
+Note that we need to use Minikube-specific commands as Minikube cannot setup a load balancer for real. To tear-down the load balancer, replication controller, pod and Minikube cluster run the following commands in sequence,
 
 ```bash
 kubectl delete rc test-ml-score-api
@@ -152,7 +152,7 @@ In order to perform testing on a real-world Kubernetes cluster with far greater 
 
 ### Getting Up-and-Running with Google Cloud Platform
 
-Before we can use Google Cloud Platform, sign-up for an account and create a project specifically for this work. Next, make sure that the GCP SDK is installed on your local machine - for example,
+Before we can use Google Cloud Platform, sign-up for an account and create a project specifically for this work. Next, make sure that the GCP SDK is installed on your local machine - e.g.,
 
 ```bash
 brew cask install google-cloud-sdk
@@ -184,14 +184,14 @@ And then go make a cup of coffee while you wait for the cluster to be created.
 
 ### Launching the Containerised ML Model Scoring Service on the GCP
 
-This is largely the same as we did for running the test service locally using Minikube,
+This is largely the same as we did for running the test service locally using Minikube - run the following commands in sequence,
 
 ```bash
 kubectl run test-ml-score-api --image=alexioannides/test-ml-score-api:latest --port=5000 --generator=run/v1
 kubectl expose rc test-ml-score-api --type=LoadBalancer --name test-ml-score-api-http
 ```
 
-But, to find the external IP address for the GCP cluster we need to use,
+But, to find the external IP address for the GCP cluster we will need to use,
 
 ```bash
 kubectl get services
@@ -230,7 +230,7 @@ kubectl delete service test-ml-score-api-http
 
 ## Switching Between Kubectl Contexts
 
-If you are running both with Minikube locally and with a cluster on GCP then you can switch Kubectl 'context' from one cluster to the other using, for example,
+If you are running both with Minikube locally and with a cluster on GCP then you can switch Kubectl [context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/) from one cluster to the other using, for example,
 
 ```bash
 kubectl config use-context minikube
@@ -244,7 +244,7 @@ kubectl config get-contexts
 
 ## Installing Ksonnet
 
-Seldon uses [Ksonnet](https://ksonnet.io) - a templating system for configuring Kubernetes to deploy ML applications. Although we haven't made use of it in the above examples, the standard way of defining, creating pods and services on Kubernetes is by posting YAML files to the Kubernetes API. These can grow quite large and be hard to manage, especially when it comes to composing deployments. This is where Ksonnet comes in - by allowing you to define Kubernetes application components using templated JSON configuration files, instead of YAML. The easiest way to install Ksonnet (on Mac OS X) is to use Homebrew again,
+Seldon uses [Ksonnet](https://ksonnet.io) - a templating system for configuring Kubernetes to deploy applications. Although we haven't made use of it in the above examples, the standard way of defining and creating pods and services on Kubernetes, is by posting YAML files to the Kubernetes API. These can grow quite large and be hard to manage, especially when it comes to composing complicated deployments. This is where Ksonnet comes in - by allowing you to define naturally composable Kubernetes application components using templated JSON-object configuration files, instead of having to write a 'wall of YAML' for every deployment. The easiest way to install Ksonnet (on Mac OS X) is to use Homebrew,
 
 ```bash
 brew install ksonnet/tap/ks
@@ -256,7 +256,7 @@ Conform that the installation has been successful by running,
 ks version
 ```
 
-## Using Seldon to Build a ML Model Scoring Service on Kubernetes
+## Using Seldon to Deploy a ML Model Scoring Service on Kubernetes
 
 Seldon's core mission is to simplify the deployment of complex ML prediction pipelines on top of Kubernetes. In this demonstration we are going to focus on the simplest possible example - i.e. the simple ML model scoring API we have already been using.
 
@@ -282,7 +282,7 @@ We're using [Pipenv](https://pipenv.readthedocs.io/en/latest/) to manage the Pyt
 pipenv install --python 3.6 seldon-core
 ```
 
-If you don't wish to use `pipenv` you can install `seldon-core` using `pip` into whatever environment is most convenient and then drop the use of `pipenv run` when testing with Seldon-Core later on.
+If you don't wish to use `pipenv` you can install `seldon-core` using `pip` into whatever environment is most convenient and then drop the use of `pipenv run` when testing with Seldon-Core (below).
 
 ### Building an ML Component for Seldon
 
@@ -310,9 +310,9 @@ If it works as expected (i.e. without throwing any errors), push it to an image 
 docker push alexioannides/seldon-ml-score-component
 ```
 
-### Building a ML Model Scoring Service with Seldon-Core
+### Deploying a ML Component with Seldon-Core
 
-We now move on to deploying our Seldon compatible ML component and creating a service form it. To achieve this, we will [deploy Seldon-Core using KSonnet](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet). Before we can proceed any further, we will need to grant cluster-wide super-user to our user, using Role-Based Access Control (RBAC). On GCP this is achieved with,
+We now move on to deploying our Seldon compatible ML component and creating a service form it. To achieve this, we will [deploy Seldon-Core using KSonnet](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet). Before we can proceed any further, we will need to grant a cluster-wide super-user role to our user, using Role-Based Access Control (RBAC). On GCP this is achieved with,
 
 ```bash
 kubectl create clusterrolebinding kube-system-cluster-admin \
@@ -328,7 +328,7 @@ kubectl create clusterrolebinding kube-system-cluster-admin \
     --serviceaccount kube-system:default
 ```
 
-Next, we create a Kubernetes namespace for all Seldon components that need to be deployed and we switch to it as a default,
+Next, we create a Kubernetes namespace for all Seldon components that we will deploy, and we switch to it as a default,
 
 ```bash
 kubectl create namespace seldon
@@ -361,7 +361,7 @@ We can now deploy Seldon-Core (**without** our ML component) using,
 ks apply default
 ```
 
-Finally, we deploy our model scoring API component on Seldon-Core by creating the new Ksonnet component and applying it,
+Finally, we deploy our model scoring API component on Seldon-Core by creating the new Ksonnet component that reference the Seldon-Core Docker image containing the model scoring API, and then applying it,
 
 ```bash
 ks generate seldon-serve-simple-v1alpha2 test-seldon-ml-score-api --image alexioannides/seldon-ml-score-component
@@ -386,7 +386,7 @@ kubectl get services
 
 ##### Via Port Forwarding
 
-Following the same general approach as we did for our first-principles Kubernetes deployment, but using embedded bash commands to find the Ambassador API gateway component we need to target for port-forwarding. We start with GCP,
+We follow the same general approach as we did for our first-principles Kubernetes deployment above, but using embedded bash commands to find the Ambassador API gateway component we need to target for port-forwarding. We start with GCP,
 
 ```bash
 kubectl port-forward $(kubectl get pods -n seldon -l service=ambassador -o jsonpath='{.items[0].metadata.name}') -n seldon 8003:8080
