@@ -6,8 +6,6 @@ This module defines a simple REST API for an imaginary Machine Learning
 (ML) model. It will be used for testing Docker and Kubernetes.
 """
 
-import socket
-
 from flask import abort, Flask, jsonify, make_response, request
 
 app = Flask(__name__)
