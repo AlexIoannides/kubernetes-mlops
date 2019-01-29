@@ -64,7 +64,7 @@ In order for a remote Docker host or Kubernetes cluster to have access to the im
 docker push alexioannides/test-ml-score-api
 ```
 
-Where we can now see that our chosen naming convention for the image is intrinsically linked to our target image registry (and you will need to insert your own account ID where necessary). Once the upload is finished, log onto DockerHub to confirm that the upload has been successful via the DockerHub UI.
+Where we can now see that our chosen naming convention for the image is intrinsically linked to our target image registry (and you will need to insert your own account ID where necessary). Once the upload is finished, log onto DockerHub to confirm that the upload has been successful via the [DockerHub UI](https://hub.docker.com/u/alexioannides).
 
 ## Installing Minikube for Local Development and Testing
 
