@@ -4,4 +4,4 @@ COPY . .
 EXPOSE 5000
 RUN pip install pipenv
 RUN pipenv install
-CMD ["pipenv", "run", "python", "api.py"]
+ENTRYPOINT ["pipenv", "run", "python", "api.py"]
