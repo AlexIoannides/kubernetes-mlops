@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-ml-app
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: test-ml-score-rc
+  labels:
+    app: test-ml-score
+    env: prod    
+  namespace: test-ml-app
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: test-ml-score
+        env: prod
+      namespace: test-ml-app
+    spec:
+      containers:
+      - image: alexioannides/test-ml-score-api
+        name: test-ml-score-api
+        ports:
+        - containerPort: 5000
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-ml-score-lb
+  labels:
+    app: test-ml-score
+  namespace: test-ml-app
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 5000
+    targetPort: 5000
+  selector:
+    app: test-ml-score

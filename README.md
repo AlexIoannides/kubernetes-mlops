@@ -242,9 +242,49 @@ Where the list of available contexts can be found using,
 kubectl config get-contexts
 ```
 
+## Using YAML Files to Define Kubernetes Apps
+
+Up to this point we have been using Kubectl commands to define and deploy a basic version of our ML model scoring service. This is fine for demonstrative purposes, but quickly becomes unmanageable. In practice, the standard way of defining entire applications is with YAML files that are posted to the Kubernetes API. The `py-flask-ml-score.yaml` file in the `py-flask-ml-score-api` is an example of how our ML model scoring service can be defined in a single YAML file. This can now be deployed using a single command,
+
+```bash
+kubectl create -f py-flask-ml-score-api/py-flask-ml-score.yaml
+```
+
+Note, that we have defined three separate Kubernetes components in this single file: a replication controller, a load-balancer service and a [namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/) for all of these components (and their sub-components) - using `---` to delimit the definition of each separate component. To see all components deployed into this namespace use,
+
+```bash
+kubectl get all --namespace test-ml-app
+```
+
+And likewise set the `--namespace` flag when using any `kubectl get` command to inspect the different components of our test app. Alternatively, we ca set our new namespace as the default context,
+
+```bash
+kubectl config set-context $(kubectl config current-context) --namespace=test-ml-app
+```
+
+And then run,
+
+```bash
+kubectl get all
+```
+
+Where we can switch back to the default namespace using,
+
+```bash
+kubectl config set-context $(kubectl config current-context) --namespace=default
+```
+
+To tear-down this application we can then use,
+
+```bash
+kubectl delete -f py-flask-ml-score-api/py-flask-ml-score.yaml
+```
+
+Which saves us from having to use multiple commands to delete each component individually. Refer to the [official documentation for the Kubernetes API](https://kubernetes.io/docs/home/) to understand the contents of this YAML file in greater depth.
+
 ## Installing Ksonnet
 
-Seldon uses [Ksonnet](https://ksonnet.io) - a templating system for configuring Kubernetes to deploy applications. Although we haven't made use of it in the above examples, the standard way of defining and creating pods and services on Kubernetes, is by posting YAML files to the Kubernetes API. These can grow quite large and be hard to manage, especially when it comes to composing complicated deployments. This is where Ksonnet comes in - by allowing you to define naturally composable Kubernetes application components using templated JSON-object configuration files, instead of having to write a 'wall of YAML' for every deployment. The easiest way to install Ksonnet (on Mac OS X) is to use Homebrew,
+Seldon uses [Ksonnet](https://ksonnet.io) - a templating system for configuring Kubernetes to deploy applications. Although we haven't made extenisve use of it thus far, the standard way of defining and creating pods and services on Kubernetes is by posting YAML files to the Kubernetes API - e.g. `py-flask-ml-score-api/py-flask-ml-score.yaml`, that was discussed in-passing above. These can grow quite large and be hard to manage, especially when it comes to composing complicated deployments. This is where Ksonnet comes in - by allowing you to define naturally composable Kubernetes application components using templated JSON-object configuration files, instead of having to write a 'wall of YAML' for every deployment. The easiest way to install Ksonnet (on Mac OS X) is to use Homebrew,
 
 ```bash
 brew install ksonnet/tap/ks
