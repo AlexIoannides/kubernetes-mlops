@@ -242,12 +242,12 @@ Where the list of available contexts can be found using,
 kubectl config get-contexts
 ```
 
-## Using YAML Files to Define Kubernetes Apps
+## Using YAML Files to Define and Deploy our ML Model Scoring Service
 
 Up to this point we have been using Kubectl commands to define and deploy a basic version of our ML model scoring service. This is fine for demonstrative purposes, but quickly becomes unmanageable. In practice, the standard way of defining entire applications is with YAML files that are posted to the Kubernetes API. The `py-flask-ml-score.yaml` file in the `py-flask-ml-score-api` is an example of how our ML model scoring service can be defined in a single YAML file. This can now be deployed using a single command,
 
 ```bash
-kubectl create -f py-flask-ml-score-api/py-flask-ml-score.yaml
+kubectl apply -f py-flask-ml-score-api/py-flask-ml-score.yaml
 ```
 
 Note, that we have defined three separate Kubernetes components in this single file: a replication controller, a load-balancer service and a [namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/) for all of these components (and their sub-components) - using `---` to delimit the definition of each separate component. To see all components deployed into this namespace use,
@@ -282,9 +282,13 @@ kubectl delete -f py-flask-ml-score-api/py-flask-ml-score.yaml
 
 Which saves us from having to use multiple commands to delete each component individually. Refer to the [official documentation for the Kubernetes API](https://kubernetes.io/docs/home/) to understand the contents of this YAML file in greater depth.
 
-## Installing Ksonnet
+## Using Ksonnet to Define and Deploy our ML Model Scoring Service
 
-Seldon uses [Ksonnet](https://ksonnet.io) - a templating system for configuring Kubernetes to deploy applications. Although we haven't made extenisve use of it thus far, the standard way of defining and creating pods and services on Kubernetes is by posting YAML files to the Kubernetes API - e.g. `py-flask-ml-score-api/py-flask-ml-score.yaml`, that was discussed in-passing above. These can grow quite large and be hard to manage, especially when it comes to composing complicated deployments. This is where Ksonnet comes in - by allowing you to define naturally composable Kubernetes application components using templated JSON-object configuration files, instead of having to write a 'wall of YAML' for every deployment. The easiest way to install Ksonnet (on Mac OS X) is to use Homebrew,
+Seldon uses [Ksonnet](https://ksonnet.io) - a templating system for configuring Kubernetes to deploy applications. Although we haven't made extensive use of it thus far, the standard way of defining and creating pods and services on Kubernetes is by posting YAML files to the Kubernetes API - e.g. `py-flask-ml-score-api/py-flask-ml-score.yaml` - this was discussed in-passing above. These can grow quite large and be hard to manage, especially when it comes to composing complicated deployments. This is where Ksonnet comes in - by allowing you to compose Kubernetes application components using templated JSON-object configuration files, instead of having to write a 'wall of YAML' for every deployment. 
+
+### Installing Ksonnet
+
+The easiest way to install Ksonnet (on Mac OS X) is to use Homebrew,
 
 ```bash
 brew install ksonnet/tap/ks
@@ -295,6 +299,66 @@ Conform that the installation has been successful by running,
 ```bash
 ks version
 ```
+
+### Deploy our ML Model Scoring Service
+
+The first step is to initialise a Ksonnet application and we will start by assuming that Minikube is running and is set to the current context,
+
+```bash
+ks init ksonnet-ml-score-app \
+    --context minikube \
+    --api-spec=version:v1.8.0
+```
+
+This creates a new directory `ksonnet-ml-score-app`, with the following high-level directory structure,
+
+```bash
+ksonnet-ml-score-app
+ | -- components
+ | -- environments
+ | -- lib
+ | -- vendor
+app.yaml
+```
+
+Briefly, the `components` directory will contain the files that describe each individual component that is to be deployed as part of the application, while the `environments` directory will contain details of environment-specific deployment overrides. The `app.yaml` file contains the actual environment details - e.g. Kubernetes cluster IPs and namespaces and will need to be modified if these core fields change. In order to work with this Ksonnet application, we will need to make it the current directory.
+
+```bash
+cd ksonnet-ml-score-app
+```
+
+Ksonnet defines 'components' based on prototypes - i.e. Jsonnet templates for pre-configured deployments, where the required fields for the template are provided via command line arguments. To replicate the YAML deployment used above we can use the generic `deployed-service` prototype component. To add this component to our application use,
+
+```bash
+ks generate deployed-service test-ml-app \
+  --image alexioannides/test-ml-score-api \
+  --containerPort 5000 \
+  --servicePort 8000 \
+  --replicas 2 \
+  --type ClusterIP
+```
+
+Where the configuration parameters we pass to this prototype component (or template) are self-explanatory. We can take a look at the implied deployment in YAML format using,
+
+```bash
+ks show default
+```
+
+Next, we want to specify some specific environments - in our case, one for Minikube and one for our GCP cluster, whose context names have been extracted by running `kubectl config get-contexts`. This is accomplished with,
+
+```bash
+ks env add test-local --context minikube
+ks env add gcp --context gke_k8s-ml-ops_europe-west2-b_k8s-test-cluster
+```
+
+Deploying to each environment in-turn is as simple as running,
+
+```bash
+ks apply test-local
+ks apply gcp
+```
+
+Which demonstrates the power of Ksonnet! Deploying new components is as simple as running the `ks generate` command with the appropriate prototype and re-applying (and similarly for modifying existing deployments).
 
 ## Using Seldon to Deploy a ML Model Scoring Service on Kubernetes
 
@@ -388,11 +452,11 @@ cd seldon-ksonnet-ml-score-app && \
     ks registry add seldon-core github.com/SeldonIO/seldon-core/tree/master/seldon-core && \
     ks pkg install seldon-core/seldon-core@master && \
     ks generate seldon-core seldon-core \
-    --withApife=false \
-    --withAmbassador=true \
-    --withRbac=true \
-    --singleNamespace=true \
-    --namespace=seldon
+      --withApife=false \
+      --withAmbassador=true \
+      --withRbac=true \
+      --singleNamespace=true \
+      --namespace=seldon
 ```
 
 We can now deploy Seldon-Core (**without** our ML component) using,

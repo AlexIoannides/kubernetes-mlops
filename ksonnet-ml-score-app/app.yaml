@@ -1,0 +1,21 @@
+apiVersion: 0.3.0
+environments:
+  gcp:
+    destination:
+      namespace: default
+      server: https://35.189.93.241
+    k8sVersion: v1.10.11
+    path: gcp
+  test-local:
+    destination:
+      namespace: default
+      server: https://192.168.99.107:8443
+    k8sVersion: v1.12.4
+    path: test-local
+kind: ksonnet.io/app
+name: ksonnet-ml-score-app
+registries:
+  incubator:
+    protocol: github
+    uri: github.com/ksonnet/parts/tree/master/incubator
+version: 0.0.1
