@@ -321,7 +321,7 @@ ksonnet-ml-score-app
 app.yaml
 ```
 
-Briefly, the `components` directory will contain the files that describe each individual component that is to be deployed as part of the application, while the `environments` directory will contain details of environment-specific deployment overrides. The `app.yaml` file contains the actual environment details - e.g. Kubernetes cluster IPs and namespaces and will need to be modified if these core fields change. In order to work with this Ksonnet application, we will need to make it the current directory.
+Briefly, the `components` directory will contain the files that describe each individual component that is to be deployed as part of the application, while the `environments` directory will contain details of environment-specific deployment overrides. The `app.yaml` file contains the actual environment details - e.g. **Kubernetes cluster IPs and namespaces and will need to be modified if these core fields change**. In order to work with this Ksonnet application, we will need to make it the current directory.
 
 ```bash
 cd ksonnet-ml-score-app
@@ -416,7 +416,7 @@ docker push alexioannides/seldon-ml-score-component
 
 ### Deploying a ML Component with Seldon-Core
 
-We now move on to deploying our Seldon compatible ML component and creating a service form it. To achieve this, we will [deploy Seldon-Core using KSonnet](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet). Before we can proceed any further, we will need to grant a cluster-wide super-user role to our user, using Role-Based Access Control (RBAC). On GCP this is achieved with,
+We now move on to deploying our Seldon compatible ML component and creating a service from it. To achieve this, we will [deploy Seldon-Core using KSonnet](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet). Before we can proceed any further, we will need to grant a cluster-wide super-user role to our user, using Role-Based Access Control (RBAC). On GCP this is achieved with,
 
 ```bash
 kubectl create clusterrolebinding kube-system-cluster-admin \
@@ -439,27 +439,37 @@ kubectl create namespace seldon
 kubectl config set-context $(kubectl config current-context) --namespace=seldon
 ```
 
-We now need to define our Seldon ML deployment using Seldon's Ksonnet templates. We start by initialising a new Ksonnet application,
+We now need to define our Seldon ML deployment using Seldon's Ksonnet templates, using the same workflow as we did for the Ksonnet deployment of our simple ML model scoring service. We start by initialising a new Ksonnet application,
 
 ```bash
 ks init seldon-ksonnet-ml-score-app --api-spec=version:v1.8.0
 ```
 
-This will create a new directory - `seldon-ksonnet-ml-score-app` - that contains all of the necessary base configuration files for a Ksonnet-based deployment. We now need to add the necessary Seldon-Core components to the application using the following set of concatenated commands,
+This will create a new directory - `seldon-ksonnet-ml-score-app` - containing all of the necessary base configuration files for a Ksonnet-based deployment. We start by changing our current directory,
 
 ```bash
-cd seldon-ksonnet-ml-score-app && \
-    ks registry add seldon-core github.com/SeldonIO/seldon-core/tree/master/seldon-core && \
-    ks pkg install seldon-core/seldon-core@master && \
-    ks generate seldon-core seldon-core \
-      --withApife=false \
-      --withAmbassador=true \
-      --withRbac=true \
-      --singleNamespace=true \
-      --namespace=seldon
+cd seldon-ksonnet-ml-score-app
 ```
 
-We can now deploy Seldon-Core (**without** our ML component) using,
+To be able to add the base Seldon-Core components to the application we first of all need to link to the Seldon Ksonnet registry (located on GitHub) and install the Seldon-Core Ksonnet package,
+
+```bash
+ks registry add seldon-core github.com/SeldonIO/seldon-core/tree/master/seldon-core
+ks pkg install seldon-core/seldon-core@master
+```
+
+Then we can generate the Seldon-Core components from the Seldon-Core prototype deployment,
+
+```bash
+ks generate seldon-core seldon-core \
+    --withApife=false \
+    --withAmbassador=true \
+    --withRbac=true \
+    --singleNamespace=true \
+    --namespace=seldon
+```
+
+We can now deploy Seldon-Core - **without** our ML component - to the default environment (extracted from the current kubectl context) using,
 
 ```bash
 ks apply default
@@ -506,9 +516,9 @@ We can then test the model scoring API deployed via Seldon-Core, using the API d
 
 ```bash
 curl http://localhost:8003/seldon/test-seldon-ml-score-api/api/v0.1/predictions \
-    -request POST
-    -header "Content-Type: application/json" \
-    -data '{"data":{"names":["a","b"],"tensor":{"shape":[2,2],"values":[0,0,1,1]}}}'
+    --request POST \
+    --header "Content-Type: application/json" \
+    --data '{"data":{"names":["a","b"],"tensor":{"shape":[2,2],"values":[0,0,1,1]}}}'
 ```
 
 ##### Via the Public Internet
@@ -516,10 +526,10 @@ curl http://localhost:8003/seldon/test-seldon-ml-score-api/api/v0.1/predictions 
 For the GCP service we exposed to the public internet use,
 
 ```bash
-curl 35.230.142.73:8080/seldon/test-seldon-ml-score-api/api/v0.1/predictions
-    -request POST
-    -header "Content-Type: application/json"
-    -data '{"data":{"names":["a","b"],"tensor":{"shape":[2,2],"values":[0,0,1,1]}}}'
+curl 35.230.142.73:8080/seldon/test-seldon-ml-score-api/api/v0.1/predictions \
+    --request POST \
+    --header "Content-Type: application/json" \
+    --data '{"data":{"names":["a","b"],"tensor":{"shape":[2,2],"values":[0,0,1,1]}}}'
 ```
 
 #### Tear Down
@@ -527,15 +537,7 @@ curl 35.230.142.73:8080/seldon/test-seldon-ml-score-api/api/v0.1/predictions
 We start by deleting the Ksonnet deployment from the Kubernetes cluster,
 
 ```bash
-cd seldon-ksonnet-ml-score-app
 ks delete default
-cd ..
-```
-
-Then we delete the Ksonnet application,
-
-```bash
-rm -rf seldon-ksonnet-ml-score-app
 ```
 
 If the GCP cluster needs to be killed run,
