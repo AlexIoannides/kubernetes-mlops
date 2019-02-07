@@ -294,10 +294,19 @@ As before, the easiest way to install Helm onto Mac OS X is to use the Homebrew 
 brew install kubernetes-helm
 ```
 
-Helm relies on a dedicated deployment server, referred to as the 'Tiller', to be running within the same Kubernetes cluster we wish to deploy our applications to. To deploy the Helm Tiller to your Kubernetes cluster use,
+Helm relies on a dedicated deployment server, referred to as the 'Tiller', to be running within the same Kubernetes cluster we wish to deploy our applications to. Before we deploy Tiller we need to create a cluster-wide super-user role to assign to it (via a dedicated service account),
 
 ```bash
-helm init
+kubectl --namespace kube-system create serviceaccount tiller
+kubectl create clusterrolebinding tiller \
+    --clusterrole cluster-admin \
+    --serviceaccount=kube-system:tiller
+```
+
+We can now deploy the Helm Tiller to your Kubernetes cluster using,
+
+```bash
+helm init --service-account tiller
 ```
 
 ### Deploy our ML Model Scoring Service
@@ -490,7 +499,7 @@ Seldon's core mission is to simplify the deployment of complex ML prediction pip
 
 ### Installing Source-to-Image
 
-Seldon-core depends heavily on [Source-to-Image](https://github.com/openshift/source-to-image) - a tool for automating the process of building code artifacts from source and injecting them into docker images. In Seldon's use-case the artifacts are the different pieces of an ML pipeline. We use Homebrew to install on Mac OS X,
+Seldon-core depends heavily on [Source-to-Image](https://github.com/openshift/source-to-image) - a tool for automating the process of building code artifacts from source and injecting them into docker images. In Seldon's use-case the artifacts are the different pieces of an ML pipeline. We use Homebrew to install Source-to-Image on Mac OS X,
 
 ```bash
 brew install source-to-image
@@ -504,13 +513,13 @@ s2i version
 
 ### Install the Seldon-Core Python Package
 
-We're using [Pipenv](https://pipenv.readthedocs.io/en/latest/) to manage the Python dependencies for this project. To install `seldon-core` into a virtual environment that is only used by this project use,
+We're using [Pipenv](https://pipenv.readthedocs.io/en/latest/) to manage the Python dependencies for this project. To install `seldon-core` into a virtual environment managed by Pipenv for use only by this project use,
 
 ```bash
 pipenv install --python 3.6 seldon-core
 ```
 
-If you don't wish to use `pipenv` you can install `seldon-core` using `pip` into whatever environment is most convenient and then drop the use of `pipenv run` when testing with Seldon-Core (below).
+Note, that we are specifying Python 3.6 explicitly, as at the time of writing Seldon-Core does not work with Python 3.7. If you don't wish to use `pipenv` you can install `seldon-core` using `pip` into whatever environment is most convenient and then drop the use of `pipenv run` when testing with Seldon-Core (below).
 
 ### Building an ML Component for Seldon
 
@@ -538,13 +547,14 @@ If it works as expected (i.e. without throwing any errors), push it to an image 
 docker push alexioannides/seldon-ml-score-component
 ```
 
-### Configuring Role Based Access Control for Seldon-Core
+### Configuring Kubernetes for Seldon-Core
 
 Before we can proceed any further, we will need to grant a cluster-wide super-user role to our user, using Role-Based Access Control (RBAC). On GCP this is achieved with,
 
 ```bash
 kubectl create clusterrolebinding kube-system-cluster-admin \
     --clusterrole cluster-admin \
+    --serviceaccount kube-system:default \
     --user $(gcloud info --format="value(config.account)")
 ```
 
@@ -556,31 +566,43 @@ kubectl create clusterrolebinding kube-system-cluster-admin \
     --serviceaccount kube-system:default
 ```
 
-Next, we create a Kubernetes namespace for all Seldon components that we will deploy, and we switch to it as a default,
+Next, we create a Kubernetes namespace for all Seldon components that we will deploy,
 
 ```bash
 kubectl create namespace seldon
+```
+
+And we then set it as a default for the current kubectl context,
+
+```bash
 kubectl config set-context $(kubectl config current-context) --namespace=seldon
 ```
 
+So that whenever we run a kubectl command it will now explicitly reference the `seldon` namespace.
+
 ### Deploying a ML Component with Seldon-Core via Ksonnet
 
-We now move on to deploying our Seldon compatible ML component and creating a service from it. To achieve this, we will [deploy Seldon-Core using KSonnet](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet). We will define our Seldon ML deployment using Seldon's Ksonnet templates, using the same workflow as we did for the Ksonnet deployment of our simple ML model scoring service. We start by initialising a new Ksonnet application,
+We now move on to deploying our Seldon compatible ML component and creating a service from it. To achieve this, we will start by demonstrating how to [deploy Seldon-Core using KSonnet](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet). We will define our Seldon ML deployment using Seldon's Ksonnet prototypes, using the same workflow as we did for the Ksonnet deployment of our simple ML model scoring service (above). We start by initialising a new Ksonnet application,
 
 ```bash
 ks init seldon-ksonnet-ml-score-app --api-spec=version:v1.8.0
 ```
 
-This will create a new directory - `seldon-ksonnet-ml-score-app` - containing all of the necessary base configuration files for a Ksonnet-based deployment. We start by changing our current directory,
+This will create a new directory - `seldon-ksonnet-ml-score-app` - containing all of the necessary base configuration files for a Ksonnet-based deployment. We start by changing our current directory accordingly,
 
 ```bash
 cd seldon-ksonnet-ml-score-app
 ```
 
-To be able to add the base Seldon-Core components to the application we first of all need to link to the Seldon Ksonnet registry (located on GitHub) and install the Seldon-Core Ksonnet package,
+To be able to add the base Seldon-Core components to the application we first need to link to the Seldon Ksonnet registry (located on GitHub),
 
 ```bash
 ks registry add seldon-core github.com/SeldonIO/seldon-core/tree/master/seldon-core
+```
+
+And then install the Seldon-Core Ksonnet package,
+
+```bash
 ks pkg install seldon-core/seldon-core@master
 ```
 
@@ -601,7 +623,7 @@ We can now deploy Seldon-Core - **without** our ML component - to the default en
 ks apply default
 ```
 
-Finally, we deploy our model scoring API component on Seldon-Core by creating the new Ksonnet component that reference the Seldon-Core Docker image containing the model scoring API, and then applying it,
+Finally, we deploy our model scoring API component on Seldon-Core by creating the new Ksonnet component that references the Seldon-Core Docker image containing the model scoring API and then applying it, as follows,
 
 ```bash
 ks generate seldon-serve-simple-v1alpha2 test-seldon-ml-score-api --image alexioannides/seldon-ml-score-component
@@ -610,7 +632,7 @@ ks apply default -c test-seldon-ml-score-api
 
 ### Deploying a ML Component with Seldon-Core via Helm Charts
 
-Custom Resource Definition
+To deploy Seldon-Core using Helm and Helm charts, we start by deploying the Seldon Custom Resource Definitions (CRD), directly from the Seldon chart repository hosted at `https://storage.googleapis.com/seldon-charts`,
 
 ```bash
 helm install seldon-core-crd \
@@ -619,7 +641,7 @@ helm install seldon-core-crd \
     --set usage_metrics.enabled=true
 ```
 
-Seldon-Core
+We then do the same for Seldon-Core,
 
 ```bash
 helm install seldon-core \
@@ -632,17 +654,20 @@ helm install seldon-core \
     --set namespace=seldon
 ```
 
-Model
+If we now run `helm list --namespace seldon` we should see that Seldon-Core has been deployed and is waiting for Seldon ML components to be deployed alongside it. To deploy our Seldon-compatible ML model score service we configure and deploy another Seldon chart as follows,
 
 ```bash
 helm install seldon-single-model \
-    --name test-seldon-ml-score-api --repo https://storage.googleapis.com/seldon-charts \
+    --name test-seldon-ml-score-api \
+    --repo https://storage.googleapis.com/seldon-charts \
     --set model.image.name=alexioannides/seldon-ml-score-component
 ```
 
+Note the similarities in the steps used for both Ksonnet and Helm Seldon deployments.
+
 ### Testing the API
 
-Regardless of how we deployed Seldon-Core and our ML model scoring service, we will test the result with the same set of approaches.
+Regardless of how we deployed Seldon-Core and our Seldon-compatible ML model scoring service, we will test the result with the same approaches we have been using above.
 
 #### Via Port Forwarding
 
@@ -684,7 +709,7 @@ minikube service list
 And then to test the pubic endpoint use, for example,
 
 ```bash
-curl http://192.168.99.110:32230/seldon/test-seldon-ml-score-api/api/v0.1/predictions \
+curl http://192.168.99.111:32074/seldon/test-seldon-ml-score-api/api/v0.1/predictions \
     --request POST \
     --header "Content-Type: application/json" \
     --data '{"data":{"names":["a","b"],"tensor":{"shape":[2,2],"values":[0,0,1,1]}}}'
@@ -692,13 +717,13 @@ curl http://192.168.99.110:32230/seldon/test-seldon-ml-score-api/api/v0.1/predic
 
 ### Tear Down
 
-To delete a Ksonnet deployment from the Kubernetes cluster make sure you are in the application directory and then use,
+To delete a Ksonnet deployment from the Kubernetes cluster, make sure you are in the application directory and then use,
 
 ```bash
 ks delete default
 ```
 
-To delete a Helm deployment from the Kubernetes cluster first retrieve a list of all the releases in the Seldon namespace,
+To delete a Helm deployment from the Kubernetes cluster, first retrieve a list of all the releases in the Seldon namespace,
 
 ```bash
 helm list --namespace seldon
