@@ -256,7 +256,7 @@ Note, that we have defined three separate Kubernetes components in this single f
 kubectl get all --namespace test-ml-app
 ```
 
-And likewise set the `--namespace` flag when using any `kubectl get` command to inspect the different components of our test app. Alternatively, we ca set our new namespace as the default context,
+And likewise set the `--namespace` flag when using any `kubectl get` command to inspect the different components of our test app. Alternatively, we can set our new namespace as the default context,
 
 ```bash
 kubectl config set-context $(kubectl config current-context) --namespace=test-ml-app
@@ -282,9 +282,133 @@ kubectl delete -f py-flask-ml-score-api/py-flask-ml-score.yaml
 
 Which saves us from having to use multiple commands to delete each component individually. Refer to the [official documentation for the Kubernetes API](https://kubernetes.io/docs/home/) to understand the contents of this YAML file in greater depth.
 
+## Using Helm Charts to Define and Deploy our ML Model Scoring Service
+
+Writing YAML files for Kubernetes can get repetitive and hard to manage, especially if there is a lot of 'copy paste' involved when only a handful of parameters need to be changed from one deployment to the next and when there is a 'wall of YAML' that needs to be modified. Enter [Helm](https://helm.sh//) - a framework for creating, executing and managing Kubernetes deployment templates. What follows is a very high-level demonstration of how Helm can be used to deploy our ML model scoring service - for a comprehensive discussion of Helm's full capabilities, please refer to the [official documentation](https://docs.helm.sh). Seldon-Core can also be deployed using Helm and we will cover this in more detail later on.
+
+### Installing Helm
+
+As before, the easiest way to install Helm onto Mac OS X is to use the Homebrew package manager,
+
+```bash
+brew install kubernetes-helm
+```
+
+Helm relies on a dedicated deployment server, referred to as the 'Tiller', to be running within the same Kubernetes cluster we wish to deploy our applications to. To deploy the Helm Tiller to your Kubernetes cluster use,
+
+```bash
+helm init
+```
+
+### Deploy our ML Model Scoring Service
+
+To initiate a new deployment - referred to as a Chart in Helm's parlance - run,
+
+```bash
+helm create helm-ml-score-app
+```
+
+This creates a new directory `helm-ml-score-app`, with the following high-level directory structure,
+
+```bash
+helm-ml-score-app/
+ | -- charts/
+ | -- templates/
+ | Chart.yaml
+ | values.yaml
+```
+
+Briefly, the `charts` directory contains other charts that our new chart will depend on (we will not make use of this), the `templates` directory contains our Helm templates, `Chart.yaml` contains core information for our chart (e.g. name and version information) and `values.yaml` contains default values to render our templates with (in the case that no values are passed from the command line).
+
+The next step is to delete all of the files in the `templates` directory (apart from `NOTES.txt`), and to replace them with our own. We start with `namespace.yaml` for declaring a namespace for our app,
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.app.namespace }}
+```
+
+Anyone familiar with HTML templating frameworks (e.g. Jinja), will be familiar with the use of ``{{}}`` for defining values that will be injected into the rendered template. In this specific instance `.Values.app.namespace` injects the `app.namespace` variable, whose default value defined in `values.yaml`. Next we define the contents of our pod in `pod.yaml`,
+
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: {{ .Values.app.name }}-rc
+  labels:
+    app: {{ .Values.app.name }}
+    env: {{ .Values.app.env }}
+  namespace: {{ .Values.app.namespace }}
+spec:
+  replicas: {{ .Values.replicas }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.app.name }}
+        env: {{ .Values.app.env }}
+      namespace: {{ .Values.app.namespace }}
+    spec:
+      containers:
+      - image: {{ .Values.app.image }}
+        name: {{ .Values.app.name }}-api
+        ports:
+        - containerPort: {{ .Values.containerPort }}
+          protocol: TCP
+```
+
+And the details of the load balancer service in `service.yaml`,
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.app.name }}-lb
+  labels:
+    app: {{ .Values.app.name }}
+  namespace: {{ .Values.app.namespace }}
+spec:
+  type: LoadBalancer
+  ports:
+  - port: {{ .Values.containerPort }}
+    targetPort: {{ .Values.targetPort }}
+  selector:
+    app: {{ .Values.app.name }}
+```
+
+What we have done, in essence, is to split-out each component of the deployment details from `py-flask-ml-score.yaml` into its own file and then define template variables for each parameter of the configuration that is most likely to change from one deployment to the next. To test and examine the rendered template, without having to attempt a deployment, run,
+
+```bash
+helm install helm-ml-score-app --debug --dry-run
+```
+
+Then, to execute the deployment and generate a release from the chart run,
+
+```bash
+helm install helm-ml-score-app
+```
+
+This will automatically print the status of the release, together with the name that Helm has ascribed to it (e.g. 'willing-yak') and the contents of `NOTES.txt` rendered to the terminal. To list all available Helm releases and their names use,
+
+```bash
+helm list
+```
+
+And to the status of all their constituent components (e.g. pods, replication controllers, service, etc.) use for example,
+
+```bash
+helm status willing-yak
+```
+
+The ML scoring service can now be tested in exactly the same way as we have done above. Once you have convinced yourself that it's working as expected, the releases can be deleted using,
+
+```bash
+helm delete willing-way
+```
+
 ## Using Ksonnet to Define and Deploy our ML Model Scoring Service
 
-Seldon uses [Ksonnet](https://ksonnet.io) - a templating system for configuring Kubernetes to deploy applications. Although we haven't made extensive use of it thus far, the standard way of defining and creating pods and services on Kubernetes is by posting YAML files to the Kubernetes API - e.g. `py-flask-ml-score-api/py-flask-ml-score.yaml` - this was discussed in-passing above. These can grow quite large and be hard to manage, especially when it comes to composing complicated deployments. This is where Ksonnet comes in - by allowing you to compose Kubernetes application components using templated JSON-object configuration files, instead of having to write a 'wall of YAML' for every deployment. 
+Another framework for templating the configuration of Kubernetes application deployments is [Ksonnet](https://ksonnet.io). Ksonnet allows you to compose Kubernetes application components using templated JSON-object configuration files, written in data templating language called [Jsonnet](https://jsonnet.org) (a supset of JSON). This alternative to Helm is also supported as a means of deploying Seldon-Core (demonstrate below).
 
 ### Installing Ksonnet
 
@@ -313,12 +437,12 @@ ks init ksonnet-ml-score-app \
 This creates a new directory `ksonnet-ml-score-app`, with the following high-level directory structure,
 
 ```bash
-ksonnet-ml-score-app
- | -- components
- | -- environments
- | -- lib
- | -- vendor
-app.yaml
+ksonnet-ml-score-app/
+ | -- components/
+ | -- environments/
+ | -- lib/
+ | -- vendor/
+ | app.yaml
 ```
 
 Briefly, the `components` directory will contain the files that describe each individual component that is to be deployed as part of the application, while the `environments` directory will contain details of environment-specific deployment overrides. The `app.yaml` file contains the actual environment details - e.g. **Kubernetes cluster IPs and namespaces and will need to be modified if these core fields change**. In order to work with this Ksonnet application, we will need to make it the current directory.
