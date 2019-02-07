@@ -1,12 +1,12 @@
 # Deploying Machine Learning Models on Kubernetes
 
-A common pattern for deploying Machine Learning (ML) models into production environments - e.g. a ML model trained using the SciKit Learn package in Python and ready to provide predictions on new data - is to expose them as a RESTful API microservices that are hosted from within Docker containers, that are in-turn deployed to a cloud environment for handling everything required for maintaining continuous availability - e.g. fail-over, auto-scaling, load balancing and rolling service updates.
+A common pattern for deploying Machine Learning (ML) models into production environments - e.g. a ML model trained using the SciKit Learn package in Python and ready to provide predictions on new data - is to expose them as a RESTful API microservices, hosted from within Docker containers, that are in-turn deployed to a cloud environment for handling everything required for maintaining continuous availability - e.g. fail-over, auto-scaling, load balancing and rolling service updates.
 
 The configuration details for a continuously available cloud deployment are specific to the targeted cloud provider(s) - e.g. the deployment process and topology for Amazon Web Services is not the same as that for Microsoft Azure. This constitutes knowledge that needs to be acquired for every targeted cloud provider. Furthermore, it is difficult (some would say near impossible) to test entire deployment strategies locally, which makes issues such as networking hard to debug.
 
 [Kubernetes](https://kubernetes.io) is a container orchestration platform that seeks to address these issues. Briefly, it provides a mechanism for defining **entire** microservice-based application deployment topologies and their service-level requirements for maintaining continuous availability. It is agnostic to the targeted cloud provider, can be run on-premises and even locally - all that's required is a cluster of virtual machines running Kubernetes - i.e. a Kubernetes cluster.
 
-This repository contains the code, configuration files and Kubernetes instructions for demonstrating how a simple Python ML model can be turned into a production-grade RESTful model scoring (or prediction) API service, using Kubernetes - both locally and with Google Cloud Platform (GCP). It is not a comprehensive guide to Kubernetes or ML - more of a 'ML on Kubernetes 101' to demonstrate capability and allow newcomers to Kubernetes to get up-and-running and become familiar with the basic concepts.
+This repository contains sample code, configuration files and Kubernetes instructions for demonstrating how a simple Python ML model can be turned into a production-grade RESTful model scoring (or prediction) API service, using Kubernetes - both locally and with Google Cloud Platform (GCP). It is not a comprehensive guide to Kubernetes or ML - think of it more as a 'ML on Kubernetes 101' for demonstrating capability and allowing newcomers to Kubernetes to get up-and-running and become familiar with the basic concepts.
 
 We perform the ML model deployment using two different approaches: a first principles approach using Docker and Kubernetes; and then a deployment using the [Seldon-Core](https://www.seldon.io) framework for managing ML model pipelines on Kubernetes. The former will help to appreciate the latter, which constitutes a powerful framework for deploying and performance-monitoring many complex ML model pipelines.
 
@@ -58,17 +58,17 @@ docker rm test-api
 
 ### Pushing a Docker Image to DockerHub
 
-In order for a remote Docker host or Kubernetes cluster to have access to the image we've created, we need to publish it to an image registry. All the cloud computing providers that offer managed Docker-based services will provide private image registries, but we will use the public image registry at DockerHub. To push our new image to DockerHub (where my account ID is 'alexioannides') use,
+In order for a remote Docker host or Kubernetes cluster to have access to the image we've created, we need to publish it to an image registry. All cloud computing providers that offer managed Docker-based services will provide private image registries, but we will use the public image registry at DockerHub. To push our new image to DockerHub (where my account ID is 'alexioannides') use,
 
 ```bash
 docker push alexioannides/test-ml-score-api
 ```
 
-Where we can now see that our chosen naming convention for the image is intrinsically linked to our target image registry (and you will need to insert your own account ID where necessary). Once the upload is finished, log onto DockerHub to confirm that the upload has been successful via the [DockerHub UI](https://hub.docker.com/u/alexioannides).
+Where we can now see that our chosen naming convention for the image is intrinsically linked to our target image registry (you will need to insert your own account ID where necessary). Once the upload is finished, log onto DockerHub to confirm that the upload has been successful via the [DockerHub UI](https://hub.docker.com/u/alexioannides).
 
 ## Installing Minikube for Local Development and Testing
 
-[Minikube](https://github.com/kubernetes/minikube) allows a single node Kubernetes cluster to run within a Virtual Machine (VM) on a local machine for development purposes. On Mac OS X, the steps required to get up-and-running are as follows:
+[Minikube](https://github.com/kubernetes/minikube) allows a single node Kubernetes cluster to run within a Virtual Machine (VM) within a local machine, for development purposes. On Mac OS X, the steps required to get up-and-running are as follows:
 
 - make sure the [Homebrew](https://brew.sh) package manager for OS X is installed; then,
 - install VirtualBox using, `brew cask install virtualbox` (you may need to approve installation via OS X System Preferences); and then,
@@ -80,7 +80,7 @@ To start the test cluster run,
 minikube start --memory 4096
 ```
 
-Where we have specified the minimum amount of memory required to deploy a single Seldon ML component. This may take a while. To test that the cluster is operational run,
+Where we have specified the minimum amount of memory required to deploy a single Seldon ML component. Be patient - Minikube may take a while to start. To test that the cluster is operational run,
 
 ```bash
 kubectl cluster-info
@@ -120,7 +120,7 @@ curl http://localhost:5000/score \
 To expose the container as a (load balanced) [service](https://kubernetes.io/docs/concepts/services-networking/service/) to the outside world, we have to create a Kubernetes service that references it. This is achieved with the following command,
 
 ```bash
-kubectl expose rc test-ml-score-api --type=LoadBalancer --name test-ml-score-api-http
+kubectl expose replicationcontroller test-ml-score-api --type=LoadBalancer --name test-ml-score-api-http
 ```
 
 To check that this has worked and to find the services's external IP address run,
@@ -174,7 +174,7 @@ Which will open a browser and guide you through the necessary authentication ste
 
 ### Initialising a Kubernetes Cluster
 
-Firstly, within the GCP UI visit the Kubernetes Engine page to trigger the Kubernetes API start-up. Then from the command line we start a cluster using,
+Firstly, within the GCP UI visit the Kubernetes Engine page to trigger the Kubernetes API to start-up. From the command line we then start a cluster using,
 
 ```bash
 gcloud container clusters create k8s-test-cluster --num-nodes 3 --machine-type g1-small
@@ -188,7 +188,7 @@ This is largely the same as we did for running the test service locally using Mi
 
 ```bash
 kubectl run test-ml-score-api --image=alexioannides/test-ml-score-api:latest --port=5000 --generator=run/v1
-kubectl expose rc test-ml-score-api --type=LoadBalancer --name test-ml-score-api-http
+kubectl expose replicationcontroller test-ml-score-api --type=LoadBalancer --name test-ml-score-api-http
 ```
 
 But, to find the external IP address for the GCP cluster we will need to use,
@@ -224,13 +224,13 @@ curl http://localhost:5000/score \
 Finally, we tear-down the replication controller and load balancer,
 
 ```bash
-kubectl delete rc test-ml-score-api
+kubectl delete replicationcontroller test-ml-score-api
 kubectl delete service test-ml-score-api-http
 ```
 
 ## Switching Between Kubectl Contexts
 
-If you are running both with Minikube locally and with a cluster on GCP then you can switch Kubectl [context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/) from one cluster to the other using, for example,
+If you are running both with Minikube locally and with a cluster on GCP, then you can switch Kubectl [context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/) from one cluster to the other using, for example,
 
 ```bash
 kubectl config use-context minikube
@@ -244,7 +244,7 @@ kubectl config get-contexts
 
 ## Using YAML Files to Define and Deploy our ML Model Scoring Service
 
-Up to this point we have been using Kubectl commands to define and deploy a basic version of our ML model scoring service. This is fine for demonstrative purposes, but quickly becomes unmanageable. In practice, the standard way of defining entire applications is with YAML files that are posted to the Kubernetes API. The `py-flask-ml-score.yaml` file in the `py-flask-ml-score-api` is an example of how our ML model scoring service can be defined in a single YAML file. This can now be deployed using a single command,
+Up to this point we have been using Kubectl commands to define and deploy a basic version of our ML model scoring service. This is fine for demonstrative purposes, but quickly becomes limiting as well as unmanageable. In practice, the standard way of defining entire applications is with YAML files that are posted to the Kubernetes API. The `py-flask-ml-score.yaml` file in the `py-flask-ml-score-api` is an example of how our ML model scoring service can be defined in a single YAML file. This can now be deployed using a single command,
 
 ```bash
 kubectl apply -f py-flask-ml-score-api/py-flask-ml-score.yaml
@@ -284,7 +284,7 @@ Which saves us from having to use multiple commands to delete each component ind
 
 ## Using Helm Charts to Define and Deploy our ML Model Scoring Service
 
-Writing YAML files for Kubernetes can get repetitive and hard to manage, especially if there is a lot of 'copy paste' involved when only a handful of parameters need to be changed from one deployment to the next and when there is a 'wall of YAML' that needs to be modified. Enter [Helm](https://helm.sh//) - a framework for creating, executing and managing Kubernetes deployment templates. What follows is a very high-level demonstration of how Helm can be used to deploy our ML model scoring service - for a comprehensive discussion of Helm's full capabilities, please refer to the [official documentation](https://docs.helm.sh). Seldon-Core can also be deployed using Helm and we will cover this in more detail later on.
+Writing YAML files for Kubernetes can get repetitive and hard to manage, especially if there is a lot of 'copy paste' involved when only a handful of parameters need to be changed from one deployment to the next and there is a 'wall of YAML' that needs to be modified. Enter [Helm](https://helm.sh//) - a framework for creating, executing and managing Kubernetes deployment templates. What follows is a very high-level demonstration of how Helm can be used to deploy our ML model scoring service - for a comprehensive discussion of Helm's full capabilities (there are a lot of them), please refer to the [official documentation](https://docs.helm.sh). Seldon-Core can also be deployed using Helm and we will cover this in more detail later on.
 
 ### Installing Helm
 
@@ -311,13 +311,13 @@ helm init --service-account tiller
 
 ### Deploy our ML Model Scoring Service
 
-To initiate a new deployment - referred to as a Chart in Helm's parlance - run,
+To initiate a new deployment - referred to as a 'chart' in Helm terminology - run,
 
 ```bash
-helm create helm-ml-score-app
+helm create NAME-OF-YOUR-HELM-CHART
 ```
 
-This creates a new directory `helm-ml-score-app`, with the following high-level directory structure,
+This creates a new directory - e.g. `helm-ml-score-app` as included with this repository - with the following high-level directory structure,
 
 ```bash
 helm-ml-score-app/
@@ -338,7 +338,7 @@ metadata:
   name: {{ .Values.app.namespace }}
 ```
 
-Anyone familiar with HTML templating frameworks (e.g. Jinja), will be familiar with the use of ``{{}}`` for defining values that will be injected into the rendered template. In this specific instance `.Values.app.namespace` injects the `app.namespace` variable, whose default value defined in `values.yaml`. Next we define the contents of our pod in `pod.yaml`,
+Anyone familiar with HTML template frameworks (e.g. Jinja), will be familiar with the use of ``{{}}`` for defining values that will be injected into the rendered template. In this specific instance `.Values.app.namespace` injects the `app.namespace` variable, whose default value defined in `values.yaml`. Next we define the contents of our pod in `pod.yaml`,
 
 ```yaml
 apiVersion: v1
@@ -391,7 +391,7 @@ What we have done, in essence, is to split-out each component of the deployment 
 helm install helm-ml-score-app --debug --dry-run
 ```
 
-Then, to execute the deployment and generate a release from the chart run,
+If you are happy with the results of the 'dry run', then execute the deployment and generate a release from the chart using,
 
 ```bash
 helm install helm-ml-score-app
@@ -409,7 +409,7 @@ And to the status of all their constituent components (e.g. pods, replication co
 helm status willing-yak
 ```
 
-The ML scoring service can now be tested in exactly the same way as we have done above. Once you have convinced yourself that it's working as expected, the releases can be deleted using,
+The ML scoring service can now be tested in exactly the same way as we have done previously (above). Once you have convinced yourself that it's working as expected, the release can be deleted using,
 
 ```bash
 helm delete willing-way
@@ -417,7 +417,7 @@ helm delete willing-way
 
 ## Using Ksonnet to Define and Deploy our ML Model Scoring Service
 
-Another framework for templating the configuration of Kubernetes application deployments is [Ksonnet](https://ksonnet.io). Ksonnet allows you to compose Kubernetes application components using templated JSON-object configuration files, written in data templating language called [Jsonnet](https://jsonnet.org) (a supset of JSON). This alternative to Helm is also supported as a means of deploying Seldon-Core (demonstrate below).
+Another framework for templating the configuration of Kubernetes application deployments is [Ksonnet](https://ksonnet.io). Ksonnet allows you to compose Kubernetes application components using templated JSON-object configuration files, written in data templating language called [Jsonnet](https://jsonnet.org) (a supset of JSON). This alternative to Helm is also supported as a means of deploying Seldon-Core (demonstrated below).
 
 ### Installing Ksonnet
 
@@ -438,12 +438,12 @@ ks version
 The first step is to initialise a Ksonnet application and we will start by assuming that Minikube is running and is set to the current context,
 
 ```bash
-ks init ksonnet-ml-score-app \
+ks init NAME-OF-YOUR-KSONNET-APP \
     --context minikube \
     --api-spec=version:v1.8.0
 ```
 
-This creates a new directory `ksonnet-ml-score-app`, with the following high-level directory structure,
+This creates a new directory - e.g. `ksonnet-ml-score-app` as included with this repository - with the following high-level directory structure,
 
 ```bash
 ksonnet-ml-score-app/
@@ -499,7 +499,7 @@ Seldon's core mission is to simplify the deployment of complex ML prediction pip
 
 ### Installing Source-to-Image
 
-Seldon-core depends heavily on [Source-to-Image](https://github.com/openshift/source-to-image) - a tool for automating the process of building code artifacts from source and injecting them into docker images. In Seldon's use-case the artifacts are the different pieces of an ML pipeline. We use Homebrew to install Source-to-Image on Mac OS X,
+Seldon-core depends heavily on [Source-to-Image](https://github.com/openshift/source-to-image) - a tool for automating the process of building code artifacts from source and injecting them into docker images. For Seldon, the artifacts are the different pieces of an ML pipeline. We use Homebrew to install Source-to-Image on Mac OS X,
 
 ```bash
 brew install source-to-image
@@ -585,10 +585,10 @@ So that whenever we run a kubectl command it will now explicitly reference the `
 We now move on to deploying our Seldon compatible ML component and creating a service from it. To achieve this, we will start by demonstrating how to [deploy Seldon-Core using KSonnet](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet). We will define our Seldon ML deployment using Seldon's Ksonnet prototypes, using the same workflow as we did for the Ksonnet deployment of our simple ML model scoring service (above). We start by initialising a new Ksonnet application,
 
 ```bash
-ks init seldon-ksonnet-ml-score-app --api-spec=version:v1.8.0
+ks init NAME-OF-YOUR-SELDON-KSONNET-APP p --api-spec=version:v1.8.0
 ```
 
-This will create a new directory - `seldon-ksonnet-ml-score-app` - containing all of the necessary base configuration files for a Ksonnet-based deployment. We start by changing our current directory accordingly,
+This will create a new directory - e.g. `seldon-ksonnet-ml-score-app` as bundled with this repository - containing all of the necessary base configuration files for a Ksonnet-based deployment. We start by changing our current directory accordingly,
 
 ```bash
 cd seldon-ksonnet-ml-score-app
@@ -667,7 +667,7 @@ Note the similarities in the steps used for both Ksonnet and Helm Seldon deploym
 
 ### Testing the API
 
-Regardless of how we deployed Seldon-Core and our Seldon-compatible ML model scoring service, we will test the result with the same approaches we have been using above.
+Regardless of how we deployed Seldon-Core and our Seldon-compatible ML model scoring service, we will test it with the same approaches we have been using above.
 
 #### Via Port Forwarding
 
@@ -737,7 +737,7 @@ helm delete seldon-core-crd --purge && \
 helm delete test-seldon-ml-score-api --purge
 ```
 
-If there is GCP cluster that needs to be killed run,
+If there is a GCP cluster that needs to be killed run,
 
 ```bash
 gcloud container clusters delete k8s-test-cluster
