@@ -538,9 +538,9 @@ If it works as expected (i.e. without throwing any errors), push it to an image 
 docker push alexioannides/seldon-ml-score-component
 ```
 
-### Deploying a ML Component with Seldon-Core
+### Configuring Role Based Access Control for Seldon-Core
 
-We now move on to deploying our Seldon compatible ML component and creating a service from it. To achieve this, we will [deploy Seldon-Core using KSonnet](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet). Before we can proceed any further, we will need to grant a cluster-wide super-user role to our user, using Role-Based Access Control (RBAC). On GCP this is achieved with,
+Before we can proceed any further, we will need to grant a cluster-wide super-user role to our user, using Role-Based Access Control (RBAC). On GCP this is achieved with,
 
 ```bash
 kubectl create clusterrolebinding kube-system-cluster-admin \
@@ -563,7 +563,9 @@ kubectl create namespace seldon
 kubectl config set-context $(kubectl config current-context) --namespace=seldon
 ```
 
-We now need to define our Seldon ML deployment using Seldon's Ksonnet templates, using the same workflow as we did for the Ksonnet deployment of our simple ML model scoring service. We start by initialising a new Ksonnet application,
+### Deploying a ML Component with Seldon-Core via Ksonnet
+
+We now move on to deploying our Seldon compatible ML component and creating a service from it. To achieve this, we will [deploy Seldon-Core using KSonnet](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet). We will define our Seldon ML deployment using Seldon's Ksonnet templates, using the same workflow as we did for the Ksonnet deployment of our simple ML model scoring service. We start by initialising a new Ksonnet application,
 
 ```bash
 ks init seldon-ksonnet-ml-score-app --api-spec=version:v1.8.0
@@ -606,31 +608,45 @@ ks generate seldon-serve-simple-v1alpha2 test-seldon-ml-score-api --image alexio
 ks apply default -c test-seldon-ml-score-api
 ```
 
-#### Expose the ML Model Scoring Service to the Outside World
+### Deploying a ML Component with Seldon-Core via Helm Charts
 
-If working on GCP we can expose the service via the `ambassador` [API gateway](https://microservices.io/patterns/apigateway.html) component deployed as part of Seldon-Core,
-
-```bash
-kubectl expose deployment seldon-core-ambassador --type=LoadBalancer --name=seldon-core-ambassador-external
-```
-
-And then retrieve the external IP,
+Custom Resource Definition
 
 ```bash
-kubectl get services
+helm install seldon-core-crd \
+    --name seldon-core-crd \
+    --repo https://storage.googleapis.com/seldon-charts \
+    --set usage_metrics.enabled=true
 ```
 
-#### Testing the API
-
-##### Via Port Forwarding
-
-We follow the same general approach as we did for our first-principles Kubernetes deployment above, but using embedded bash commands to find the Ambassador API gateway component we need to target for port-forwarding. We start with GCP,
+Seldon-Core
 
 ```bash
-kubectl port-forward $(kubectl get pods -n seldon -l service=ambassador -o jsonpath='{.items[0].metadata.name}') -n seldon 8003:8080
+helm install seldon-core \
+    --name seldon-core \
+    --repo https://storage.googleapis.com/seldon-charts \
+    --set apife.enabled=false \
+    --set rbac.enabled=true \
+    --set ambassador.enabled=true \
+    --set single_namespace=true \
+    --set namespace=seldon
 ```
 
-Or if working locally with Minikube,
+Model
+
+```bash
+helm install seldon-single-model \
+    --name test-seldon-ml-score-api --repo https://storage.googleapis.com/seldon-charts \
+    --set model.image.name=alexioannides/seldon-ml-score-component
+```
+
+### Testing the API
+
+Regardless of how we deployed Seldon-Core and our ML model scoring service, we will test the result with the same set of approaches.
+
+#### Via Port Forwarding
+
+We follow the same general approach as we did for our first-principles Kubernetes deployments above, but using embedded bash commands to find the Ambassador API gateway component we need to target for port-forwarding. Regardless of whether or not we working with GCP or Minikube use,
 
 ```bash
 kubectl port-forward $(kubectl get pods -n seldon -l service=ambassador -o jsonpath='{.items[0].metadata.name}') -n seldon 8003:8080
@@ -645,26 +661,58 @@ curl http://localhost:8003/seldon/test-seldon-ml-score-api/api/v0.1/predictions 
     --data '{"data":{"names":["a","b"],"tensor":{"shape":[2,2],"values":[0,0,1,1]}}}'
 ```
 
-##### Via the Public Internet
+#### Via the Public Internet
 
-For the GCP service we exposed to the public internet use,
+Firstly, we need to expose the service to the public internet. If working on GCP we can expose the service via the `ambassador` [API gateway](https://microservices.io/patterns/apigateway.html) component deployed as part of Seldon-Core,
 
 ```bash
-curl 35.230.142.73:8080/seldon/test-seldon-ml-score-api/api/v0.1/predictions \
+kubectl expose deployment seldon-core-ambassador --type=LoadBalancer --name=seldon-core-ambassador-external
+```
+
+And then to retrieve the external IP for GCP use,
+
+```bash
+kubectl get services
+```
+
+And for Minikube use,
+
+```bash
+minikube service list
+```
+
+And then to test the pubic endpoint use, for example,
+
+```bash
+curl http://192.168.99.110:32230/seldon/test-seldon-ml-score-api/api/v0.1/predictions \
     --request POST \
     --header "Content-Type: application/json" \
     --data '{"data":{"names":["a","b"],"tensor":{"shape":[2,2],"values":[0,0,1,1]}}}'
 ```
 
-#### Tear Down
+### Tear Down
 
-We start by deleting the Ksonnet deployment from the Kubernetes cluster,
+To delete a Ksonnet deployment from the Kubernetes cluster make sure you are in the application directory and then use,
 
 ```bash
 ks delete default
 ```
 
-If the GCP cluster needs to be killed run,
+To delete a Helm deployment from the Kubernetes cluster first retrieve a list of all the releases in the Seldon namespace,
+
+```bash
+helm list --namespace seldon
+```
+
+And then remove them using,
+
+```bash
+helm delete seldon-core --purge && \
+helm delete seldon-core-crd --purge && \
+helm delete test-seldon-ml-score-api --purge
+```
+
+If there is GCP cluster that needs to be killed run,
 
 ```bash
 gcloud container clusters delete k8s-test-cluster
