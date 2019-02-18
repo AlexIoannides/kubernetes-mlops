@@ -1,18 +1,21 @@
 # Deploying Machine Learning Models on Kubernetes
 
-A common pattern for deploying Machine Learning (ML) models into production environments - e.g. a ML model trained using the SciKit Learn package in Python and ready to provide predictions on new data - is to expose them as a RESTful API microservices, hosted from within Docker containers, that are in-turn deployed to a cloud environment for handling everything required for maintaining continuous availability - e.g. fail-over, auto-scaling, load balancing and rolling service updates.
+A common pattern for deploying Machine Learning (ML) models into production environments - e.g. a ML model trained using the SciKit Learn package in Python and ready to provide predictions on new data, is to expose them as RESTful API microservices hosted from within [Docker](https://www.docker.com) containers, that are in-turn deployed to a cloud environment for handling everything required for maintaining continuous availability - e.g. fail-over, auto-scaling, load balancing and rolling service updates.
 
-The configuration details for a continuously available cloud deployment are specific to the targeted cloud provider(s) - e.g. the deployment process and topology for Amazon Web Services is not the same as that for Microsoft Azure. This constitutes knowledge that needs to be acquired for every targeted cloud provider. Furthermore, it is difficult (some would say near impossible) to test entire deployment strategies locally, which makes issues such as networking hard to debug.
+The configuration details for a continuously available cloud deployment are specific to the targeted cloud provider(s) - e.g. the deployment process and topology for Amazon Web Services is not the same as that for Microsoft Azure, which in-turn is not the same as that for Google Cloud Platform. This constitutes knowledge that needs to be acquired for every targeted cloud provider. Furthermore, it is difficult (some would say near impossible) to test entire deployment strategies locally, which makes issues such as networking hard to debug.
 
-[Kubernetes](https://kubernetes.io) is a container orchestration platform that seeks to address these issues. Briefly, it provides a mechanism for defining **entire** microservice-based application deployment topologies and their service-level requirements for maintaining continuous availability. It is agnostic to the targeted cloud provider, can be run on-premises and even locally - all that's required is a cluster of virtual machines running Kubernetes - i.e. a Kubernetes cluster.
+[Kubernetes](https://kubernetes.io) is a container orchestration platform that seeks to address these issues. Briefly, it provides a mechanism for defining **entire** microservice-based application deployment topologies and their service-level requirements for maintaining continuous availability. It is agnostic to the targeted cloud provider, can be run on-premises and even locally on your laptop - all that's required is a cluster of virtual machines running Kubernetes - i.e. a Kubernetes cluster.
 
-This repository contains sample code, configuration files and Kubernetes instructions for demonstrating how a simple Python ML model can be turned into a production-grade RESTful model scoring (or prediction) API service, using Kubernetes - both locally and with Google Cloud Platform (GCP). It is not a comprehensive guide to Kubernetes or ML - think of it more as a 'ML on Kubernetes 101' for demonstrating capability and allowing newcomers to Kubernetes to get up-and-running and become familiar with the basic concepts.
+This repository contains sample code, configuration files and Kubernetes instructions for demonstrating how a simple Python ML model can be turned into a production-grade RESTful model scoring (or prediction) API service, using Docker and Kubernetes - both locally and with Google Cloud Platform (GCP). It is not a comprehensive guide to Kubernetes, Docker or ML - think of it more as a 'ML on Kubernetes 101' for demonstrating capability and allowing newcomers to Kubernetes (e.g. data scientists who are more focused on building models as opposed to deploying them), to get up-and-running quickly and become familiar with the basic concepts.
 
-We perform the ML model deployment using two different approaches: a first principles approach using Docker and Kubernetes; and then a deployment using the [Seldon-Core](https://www.seldon.io) framework for managing ML model pipelines on Kubernetes. The former will help to appreciate the latter, which constitutes a powerful framework for deploying and performance-monitoring many complex ML model pipelines.
+We will demonstrate the ML model deployment using two different approaches: a first principles approach using Docker and Kubernetes; and then a deployment using the [Seldon-Core](https://www.seldon.io) framework for managing ML model pipelines on Kubernetes. The former will help to appreciate the latter, which constitutes a powerful framework for deploying and performance-monitoring many complex ML model pipelines.
 
-## Containerising a Simple ML Model Scoring Service
+## Containerising a Simple ML Model Scoring Service using Docker
 
-We start by demonstrating how to achieve this basic competence using the simple Python ML model scoring REST API contained in the `py-flask-ml-score-api/api.py` module, together with the Dockerfile in the `py-flask-ml-score-api` directory.
+We start by demonstrating how to achieve this basic competence using the simple Python ML model scoring REST API contained in the `py-flask-ml-score-api/api.py` module, together with the `Dockerfile` within the `py-flask-ml-score-api` directory. If you're already feeling lost then these files are discussed in the points below, otherwise feel free to skip to the next section.
+ 
+ - `api.py` is a Python module that uses the [Flask](http://flask.pocoo.org) framework for defining a web service (`app`) with a function (`score`) that executes in response to a HTTP request to a specific URL (or 'route') - e.g. running locally by executing the web service using `python run api.py`), we would reach our function (or 'endpoint') at `http://localhost:5000/score`. This function takes data sent to it as JSON (that has been automatically de-serialised as a Python dict made available as the `request` variable in our function definition), and returns a response (automatically serialised as JSON). In our example function, we expect an array of features, `X`, that we pass to a ML model, which in our example returns those same features back to the caller - i.e. our ML model is the identity function, which we have chosen for demonstrative purposes. We could have loaded a pickled SciKit-Learn model and passed the data to its `predict` method, returning its score for the feature-data as JSON, just as easily - see [here](https://github.com/AlexIoannides/ml-workflow-automation/blob/master/deploy/py-sklearn-flask-ml-service/api.py) for an example of this in action.
+ - `Dockerfile` is a [YAML](https://en.wikipedia.org/wiki/YAML) file that allows us to define the contents and configure the operation of our intended Docker container, when it is running. This static data, when not executed as a container, is referred to as the 'image'. In our example Dockerfile, we start by using a pre-configured Docker image (`python:3.6-slim`) that has a version of Linux with Python already installed; we then copy the contents of the `py-flask-ml-score-api` local directory to a directory on the image called `/usr/src/app`; then use `pip` to install the [Pipenv](https://pipenv.readthedocs.io/en/latest/) package for Python dependency management; use Pipenv to install the dependencies described in `Pipfile.lock` into a virtual environment on the image; configure port 5000 to be exposed to the 'outside world' on the running container; and finally, to start our Flask RESTful web service - `api.py`. Building this custom image and asking the Docker daemon to run it (remember that a running image is a 'container'), will expose our RESTful ML model scoring service on port 5000 as if it were running on a dedicated virtual machine. Refer to the official [Docker documentation](https://docs.docker.com/get-started/) for a more comprehensive discussion of these core concepts.
 
 ### Building a Docker Image
 
@@ -49,7 +52,7 @@ Where you should expect a response along the lines of,
 {"score":[1,2]}
 ```
 
-All our test model does is return the input data - i.e. it is the identity function (only a few lines of additional code are required to modify this service to load a SciKit Learn model from disk and pass new data to it's 'predict' method for generating predictions). Now that the container has been confirmed as operational, we can stop and remove it,
+All our test model does is return the input data - i.e. it is the identity function. Only a few lines of additional code are required to modify this service to load a SciKit Learn model from disk and pass new data to it's 'predict' method for generating predictions - see [here](https://github.com/AlexIoannides/ml-workflow-automation/blob/master/deploy/py-sklearn-flask-ml-service/api.py) for an example. Now that the container has been confirmed as operational, we can stop and remove it,
 
 ```bash
 docker stop test-api
@@ -58,7 +61,7 @@ docker rm test-api
 
 ### Pushing a Docker Image to DockerHub
 
-In order for a remote Docker host or Kubernetes cluster to have access to the image we've created, we need to publish it to an image registry. All cloud computing providers that offer managed Docker-based services will provide private image registries, but we will use the public image registry at DockerHub. To push our new image to DockerHub (where my account ID is 'alexioannides') use,
+In order for a remote Docker host or Kubernetes cluster to have access to the image we've created, we need to publish it to an image registry. All cloud computing providers that offer managed Docker-based services will provide private image registries, but we will use the public image registry at DockerHub, for convenience. To push our new image to DockerHub (where my account ID is 'alexioannides') use,
 
 ```bash
 docker push alexioannides/test-ml-score-api
@@ -68,7 +71,7 @@ Where we can now see that our chosen naming convention for the image is intrinsi
 
 ## Installing Minikube for Local Development and Testing
 
-[Minikube](https://github.com/kubernetes/minikube) allows a single node Kubernetes cluster to run within a Virtual Machine (VM) within a local machine, for development purposes. On Mac OS X, the steps required to get up-and-running are as follows:
+[Minikube](https://github.com/kubernetes/minikube) allows a single node Kubernetes cluster to run within a Virtual Machine (VM) within a local machine (i.e. on your laptop), for development purposes. On Mac OS X, the steps required to get up-and-running are as follows:
 
 - make sure the [Homebrew](https://brew.sh) package manager for OS X is installed; then,
 - install VirtualBox using, `brew cask install virtualbox` (you may need to approve installation via OS X System Preferences); and then,
@@ -90,13 +93,13 @@ Where `kubectl` is the standard Command Line Interface (CLI) client for interact
 
 ### Launching the Containerised ML Model Scoring Service on Minikube
 
-To launch our test model scoring service on Kubernetes, start by running the container within a Kubernetes [pod](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/) that is managed by a [replication controller](https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/),
+To launch our test model scoring service on Kubernetes, start by running the container within a Kubernetes [pod](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/) that is managed by a [replication controller](https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/), which is the device that ensures that at least one pod running our service is operational at any given time. This is achieved with, 
 
 ```bash
 kubectl run test-ml-score-api --image=alexioannides/test-ml-score-api:latest --port=5000 --generator=run/v1
 ```
 
-Where the `--generator=run/v1` flag triggers the construction of the replication controller to manage the pod and will in this instance ensure that there is always at least one pod (running our container), active on the cluster at any one time. To check that it's running use,
+Where the `--generator=run/v1` flag triggers the construction of the replication controller to manage the pod. To check that it's running use,
 
 ```bash
 kubectl get pods
@@ -138,7 +141,7 @@ curl http://192.168.99.100:30888/score \
     --data '{"X": [1, 2]}'
 ```
 
-Note that we need to use Minikube-specific commands as Minikube cannot setup a load balancer for real. To tear-down the load balancer, replication controller, pod and Minikube cluster run the following commands in sequence,
+Note that we need to use Minikube-specific commands as Minikube does not setup a real-life load balancer (which is what would happen if we made this request on a cloud platform). To tear-down the load balancer, replication controller, pod and Minikube cluster run the following commands in sequence,
 
 ```bash
 kubectl delete rc test-ml-score-api
@@ -417,7 +420,7 @@ helm delete willing-way
 
 ## Using Ksonnet to Define and Deploy our ML Model Scoring Service
 
-Another framework for templating the configuration of Kubernetes application deployments is [Ksonnet](https://ksonnet.io). Ksonnet allows you to compose Kubernetes application components using templated JSON-object configuration files, written in data templating language called [Jsonnet](https://jsonnet.org) (a supset of JSON). This alternative to Helm is also supported as a means of deploying Seldon-Core (demonstrated below).
+Another framework for templating the configuration of Kubernetes application deployments is [Ksonnet](https://ksonnet.io). Ksonnet allows you to compose Kubernetes application components using templated JSON-object configuration files, written in data templating language called [Jsonnet](https://jsonnet.org) (a superset of JSON). This alternative to Helm is also supported as a means of deploying Seldon-Core (demonstrated below).
 
 ### Installing Ksonnet
 
@@ -523,7 +526,7 @@ Note, that we are specifying Python 3.6 explicitly, as at the time of writing Se
 
 ### Building an ML Component for Seldon
 
-To deploy a ML component using Seldon, we need to create Seldon-compatible Docker containers. We start by following [these guidelines](https://github.com/SeldonIO/seldon-core/blob/master/docs/wrappers/python.md) for defining a Python class that wraps an ML model targeted for deployment with Seldon. This is contained within the `seldon-ml-score-component` directory. Firstly, ensure that the docker daemon is running locally and then run,
+To deploy a ML component using Seldon, we need to create Seldon-compatible Docker images. We start by following [these guidelines](https://github.com/SeldonIO/seldon-core/blob/master/docs/wrappers/python.md) for defining a Python class that wraps an ML model targeted for deployment with Seldon. This is contained within the `seldon-ml-score-component` directory. Firstly, ensure that the docker daemon is running locally and then run,
 
 ```bash
 s2i build seldon-ml-score-component seldonio/seldon-core-s2i-python3:0.4 alexioannides/seldon-ml-score-component
@@ -580,9 +583,42 @@ kubectl config set-context $(kubectl config current-context) --namespace=seldon
 
 So that whenever we run a kubectl command it will now explicitly reference the `seldon` namespace.
 
+### Deploying a ML Component with Seldon-Core via Helm Charts
+
+We now move on to deploying our Seldon compatible ML component and creating a service from it. To achieve this, we will start by demonstrating how to [deploy Seldon-Core using Helm charts](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-helm). To deploy Seldon-Core using Helm and Helm charts, we start by deploying the Seldon Custom Resource Definitions (CRD), directly from the Seldon chart repository hosted at `https://storage.googleapis.com/seldon-charts`,
+
+```bash
+helm install seldon-core-crd \
+    --name seldon-core-crd \
+    --repo https://storage.googleapis.com/seldon-charts \
+    --set usage_metrics.enabled=true
+```
+
+We then do the same for Seldon-Core,
+
+```bash
+helm install seldon-core \
+    --name seldon-core \
+    --repo https://storage.googleapis.com/seldon-charts \
+    --set apife.enabled=false \
+    --set rbac.enabled=true \
+    --set ambassador.enabled=true \
+    --set single_namespace=true \
+    --set namespace=seldon
+```
+
+If we now run `helm list --namespace seldon` we should see that Seldon-Core has been deployed and is waiting for Seldon ML components to be deployed alongside it. To deploy our Seldon-compatible ML model score service we configure and deploy another Seldon chart as follows,
+
+```bash
+helm install seldon-single-model \
+    --name test-seldon-ml-score-api \
+    --repo https://storage.googleapis.com/seldon-charts \
+    --set model.image.name=alexioannides/seldon-ml-score-component
+```
+
 ### Deploying a ML Component with Seldon-Core via Ksonnet
 
-We now move on to deploying our Seldon compatible ML component and creating a service from it. To achieve this, we will start by demonstrating how to [deploy Seldon-Core using KSonnet](https://github.com/SeldonIO/seldon-core/blob/master/docs/install.md#with-ksonnet). We will define our Seldon ML deployment using Seldon's Ksonnet prototypes, using the same workflow as we did for the Ksonnet deployment of our simple ML model scoring service (above). We start by initialising a new Ksonnet application,
+We will define our Seldon ML deployment using Seldon's Ksonnet prototypes, using the same workflow as we did for the Ksonnet deployment of our simple ML model scoring service (above). We start by initialising a new Ksonnet application,
 
 ```bash
 ks init NAME-OF-YOUR-SELDON-KSONNET-APP p --api-spec=version:v1.8.0
@@ -630,40 +666,7 @@ ks generate seldon-serve-simple-v1alpha2 test-seldon-ml-score-api --image alexio
 ks apply default -c test-seldon-ml-score-api
 ```
 
-### Deploying a ML Component with Seldon-Core via Helm Charts
-
-To deploy Seldon-Core using Helm and Helm charts, we start by deploying the Seldon Custom Resource Definitions (CRD), directly from the Seldon chart repository hosted at `https://storage.googleapis.com/seldon-charts`,
-
-```bash
-helm install seldon-core-crd \
-    --name seldon-core-crd \
-    --repo https://storage.googleapis.com/seldon-charts \
-    --set usage_metrics.enabled=true
-```
-
-We then do the same for Seldon-Core,
-
-```bash
-helm install seldon-core \
-    --name seldon-core \
-    --repo https://storage.googleapis.com/seldon-charts \
-    --set apife.enabled=false \
-    --set rbac.enabled=true \
-    --set ambassador.enabled=true \
-    --set single_namespace=true \
-    --set namespace=seldon
-```
-
-If we now run `helm list --namespace seldon` we should see that Seldon-Core has been deployed and is waiting for Seldon ML components to be deployed alongside it. To deploy our Seldon-compatible ML model score service we configure and deploy another Seldon chart as follows,
-
-```bash
-helm install seldon-single-model \
-    --name test-seldon-ml-score-api \
-    --repo https://storage.googleapis.com/seldon-charts \
-    --set model.image.name=alexioannides/seldon-ml-score-component
-```
-
-Note the similarities in the steps used for both Ksonnet and Helm Seldon deployments.
+Note the similarities in the steps used for both Ksonnet and Helm deployments.
 
 ### Testing the API
 
