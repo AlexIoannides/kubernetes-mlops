@@ -6,7 +6,7 @@ This module defines a simple REST API for an imaginary Machine Learning
 (ML) model. It will be used for testing Docker and Kubernetes.
 """
 
-from flask import abort, Flask, jsonify, make_response, request
+from flask import Flask, jsonify, make_response, request
 
 app = Flask(__name__)
 
@@ -19,7 +19,7 @@ def score():
         X - an array of input features,
 
     And will return a JSON payload with the following fields:
-        score - an array of predicionts.
+        score - an array of predictions.
     """
     try:
         features = request.json['X']
