@@ -4,6 +4,18 @@ api.py
 
 This module defines a simple REST API for an imaginary Machine Learning
 (ML) model. It will be used for testing Docker and Kubernetes.
+
+This can be tested locally on the command line, using `python api.py`
+to start the service and then in another terminal window using,
+
+```
+curl http://localhost:5000/score \
+--request POST \
+--header "Content-Type: application/json" \
+--data '{"X": [1, 2]}'
+```
+
+To test the API.
 """
 
 from typing import Iterable
