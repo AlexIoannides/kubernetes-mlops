@@ -12,9 +12,9 @@ class MLScore:
 
     def __init__(self):
         """
-        Add any initialization parameters. These will be passed at
-        runtime from the graph definition parameters defined in your
-        seldondeployment kubernetes resource manifest.
+        Load models and add any initialization parameters (these will
+        be passed at runtime from the graph definition parameters
+        defined in your seldondeployment kubernetes resource manifest).
         """
         print("Initializing")
 

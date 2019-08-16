@@ -1,23 +1,25 @@
-apiVersion: v1
-kind: ReplicationController
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: {{ .Values.app.name }}-rc
   labels:
     app: {{ .Values.app.name }}
     env: {{ .Values.app.env }}
+  name: {{ .Values.app.name }}
   namespace: {{ .Values.app.namespace }}
 spec:
-  replicas: {{ .Values.replicas }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.app.name }}
   template:
     metadata:
       labels:
         app: {{ .Values.app.name }}
         env: {{ .Values.app.env }}
-      namespace: {{ .Values.app.namespace }}
     spec:
       containers:
       - image: {{ .Values.app.image }}
-        name: {{ .Values.app.name }}-api
+        name: {{ .Values.app.name }}
         ports:
         - containerPort: {{ .Values.containerPort }}
           protocol: TCP
