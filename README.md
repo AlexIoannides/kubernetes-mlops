@@ -10,10 +10,6 @@ This README is designed to be read in conjunction with the code in this reposito
 
 We will demonstrate ML model deployment using two different approaches: a first principles approach using Docker and Kubernetes; and then a deployment using the [Seldon-Core](https://www.seldon.io) Kubernetes native framework for streamlining the deployment of ML services. The former will help to appreciate the latter, which constitutes a powerful framework for deploying and performance-monitoring many complex ML model pipelines.
 
-**Table of Contents**
-
-[TOC]
-
 ## Containerising a Simple ML Model Scoring Service using Flask and Docker
 
 We start by demonstrating how to achieve this basic competence using the simple Python ML model scoring REST API contained in the `api.py` module, together with the `Dockerfile`, both within the `py-flask-ml-score-api` directory, whose core contents are as follows,
