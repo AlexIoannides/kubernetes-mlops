@@ -518,13 +518,21 @@ Seldon's core mission is to simplify the repeated deployment and management of c
 
 ### Building an ML Component for Seldon
 
-To deploy a ML component using Seldon, we need to create Seldon-compatible Docker images. We start by following [these guidelines](https://docs.seldon.io/projects/seldon-core/en/latest/python/python_wrapping_docker.html) for defining a Python class that wraps an ML model targeted for deployment with Seldon. This is contained within the `seldon-ml-score-component` directory.
+To deploy a ML component using Seldon, we need to create Seldon-compatible Docker images. We start by following [these guidelines](https://docs.seldon.io/projects/seldon-core/en/latest/python/python_wrapping_docker.html) for defining a Python class that wraps an ML model targeted for deployment with Seldon. This is contained within the `seldon-ml-score-component` directory, whose contents are similar to those in `py-flask-ml-score-api`,
+
+```bash
+seldon-ml-score-component/
+ | Dockerfile
+ | MLScore.py
+ | Pipfile
+ | Pipfile.lock
+```
 
 #### Building the Docker Image for use with Seldon
 
 Seldon requires that the Docker image for the ML scoring service be structured in a particular way:
 
-- the ML model has to be wrapped in a Python class with a `predict` method with a particular signature (or interface) - for example, from `seldon-core-microservice/MLScore.py` we have,
+- the ML model has to be wrapped in a Python class with a `predict` method with a particular signature (or interface) - for example, in `MLScore.py` (deliberately named after the Python class contained within it) we have,
 
 ```python
 class MLScore:
@@ -555,7 +563,7 @@ class MLScore:
 ```
 
 - the `seldon-core` Python package must be installed (we use `pipenv` to manage dependencies as discussed above and in the Appendix below); and,
-- the container starts by running the Seldon service using the `seldon-core-microservice` entry-point provided by the `seldon-core` package, as can be seen from `seldon-ml-score-component/DockerFile`,
+- the container starts by running the Seldon service using the `seldon-core-microservice` entry-point provided by the `seldon-core` package - both this and the point above can be seen the `DockerFile`,
 
 ```docker
 FROM python:3.6-slim
@@ -574,7 +582,7 @@ ENV PERSISTENCE 0
 CMD pipenv run seldon-core-microservice $MODEL_NAME $API_TYPE --service-type $SERVICE_TYPE --persistence $PERSISTENCE
 ```
 
-For the precise details refer to the [offical documentation fro Seldon](https://docs.seldon.io/projects/seldon-core/en/latest/python/index.html). Next, build this image,
+For the precise details refer to the [official Seldon documentation](https://docs.seldon.io/projects/seldon-core/en/latest/python/index.html). Next, build this image,
 
 ```bash
 docker build seldon-ml-score-component -t alexioannides/test-ml-score-seldon-api:latest
