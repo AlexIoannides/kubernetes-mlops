@@ -10,6 +10,8 @@ This README is designed to be read in conjunction with the code in this reposito
 
 We will demonstrate ML model deployment using two different approaches: a first principles approach using Docker and Kubernetes; and then a deployment using the [Seldon-Core](https://www.seldon.io) Kubernetes native framework for streamlining the deployment of ML services. The former will help to appreciate the latter, which constitutes a powerful framework for deploying and performance-monitoring many complex ML model pipelines.
 
+This work was initially committed in 2018 and has since formed the basis of [Bodywork](https://bodywork.readthedocs.io/en/latest/) - a MLOps framework for running model-training workloads and deploying model-scoring services on Kubernetes. This framework, open-sourced in December 2020, is an attempt to automate a lot of the steps that this project has demonstrated to many machine learning engineers over the years.
+
 ## Containerising a Simple ML Model Scoring Service using Flask and Docker
 
 We start by demonstrating how to achieve this basic competence using the simple Python ML model scoring REST API contained in the `api.py` module, together with the `Dockerfile`, both within the `py-flask-ml-score-api` directory, whose core contents are as follows,
@@ -746,6 +748,8 @@ The following list of resources will help you dive deeply into the subjects we s
 - the excellent '_Kubernetes in Action_' by Marko Lukša [available from Manning Publications](https://www.manning.com/books/kubernetes-in-action);
 - '_Docker in Action_' by Jeff Nickoloff and Stephen Kuenzli [also available from Manning Publications](https://www.manning.com/books/docker-in-action-second-edition); and,
 - _'Flask Web Development'_ by Miguel Grinberg [O'Reilly](http://shop.oreilly.com/product/0636920089056.do).
+
+Alternatively, checkout [Bodywork](https://bodywork.readthedocs.io/en/latest/) - a MLOps framework for running model-training workloads and deploying model-scoring services on Kubernetes. This framework, of which I am one of the core contributors, is an attempt to automate a lot of the steps that this project has demonstrated to many machine learning engineers over the years.
 
 ## Appendix - Using Pipenv for Managing Python Package Dependencies
 
