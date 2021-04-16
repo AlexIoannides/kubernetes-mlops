@@ -10,7 +10,7 @@ This README is designed to be read in conjunction with the code in this reposito
 
 We will demonstrate ML model deployment using two different approaches: a first principles approach using Docker and Kubernetes; and then a deployment using the [Seldon-Core](https://www.seldon.io) Kubernetes native framework for streamlining the deployment of ML services. The former will help to appreciate the latter, which constitutes a powerful framework for deploying and performance-monitoring many complex ML model pipelines.
 
-This work was initially committed in 2018 and has since formed the basis of [Bodywork](https://bodywork.readthedocs.io/en/latest/) - a MLOps framework for running model-training workloads and deploying model-scoring services on Kubernetes. This framework, open-sourced in December 2020, is an attempt to automate a lot of the steps that this project has demonstrated to many machine learning engineers over the years.
+This work was initially committed in 2018 and has since formed the basis of [Bodywork](https://github.com/bodywork-ml/bodywork-core) - an open-source MLOps tool for deploying machine learning projects developed in Python, to Kubernetes. Bodywork automates a lot of the steps that this project has demonstrated to the many machine learning engineers that have used it over the years - take a look at the [documentation](https://bodywork.readthedocs.io/en/latest/).
 
 ## Containerising a Simple ML Model Scoring Service using Flask and Docker
 
@@ -749,7 +749,7 @@ The following list of resources will help you dive deeply into the subjects we s
 - '_Docker in Action_' by Jeff Nickoloff and Stephen Kuenzli [also available from Manning Publications](https://www.manning.com/books/docker-in-action-second-edition); and,
 - _'Flask Web Development'_ by Miguel Grinberg [O'Reilly](http://shop.oreilly.com/product/0636920089056.do).
 
-Alternatively, checkout [Bodywork](https://bodywork.readthedocs.io/en/latest/) - a MLOps framework for running model-training workloads and deploying model-scoring services on Kubernetes. This framework, of which I am one of the core contributors, is an attempt to automate a lot of the steps that this project has demonstrated to many machine learning engineers over the years.
+This work was initially committed in 2018 and has since formed the basis of [Bodywork](https://www.bodyworkml.com) - an open-source MLOps tool for deploying machine learning projects developed in Python, to Kubernetes.
 
 ## Appendix - Using Pipenv for Managing Python Package Dependencies
 
