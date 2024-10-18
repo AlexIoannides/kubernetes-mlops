@@ -4,6 +4,6 @@ app:
   namespace: test-ml-app
   image: alexioannides/test-ml-score-api
 
-replicas: 2
+replicas: 1
 containerPort: 5000
 targetPort: 5000
